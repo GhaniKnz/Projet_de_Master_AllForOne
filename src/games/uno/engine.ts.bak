@@ -1,0 +1,119 @@
+export type Color = 'R' | 'G' | 'B' | 'Y'
+export type Num = '0'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9'
+export type Action = 'S'|'R'|'D2'
+export type Wild = 'W'|'W4'
+
+export type Card = { type: 'num'|'action'|'wild'; color?: Color; value: string }
+
+const COLORS: Color[] = ['R','G','B','Y']
+const NUMS: Num[] = ['0','1','2','3','4','5','6','7','8','9']
+const ACTIONS: Action[] = ['S','R','D2']
+const WILDS: Wild[] = ['W','W4']
+
+export function makeDeck(): Card[] {
+  const deck: Card[] = []
+  // numbers
+  COLORS.forEach((c) => {
+    NUMS.forEach((n) => {
+      deck.push({ type: 'num', color: c, value: n })
+      if (n !== '0') deck.push({ type: 'num', color: c, value: n })
+    })
+    // actions: two of each per color
+    ACTIONS.forEach((a) => {
+      deck.push({ type: 'action', color: c, value: a })
+      deck.push({ type: 'action', color: c, value: a })
+    })
+  })
+  // wilds
+  WILDS.forEach((w) => {
+    for (let i = 0; i < 4; i++) deck.push({ type: 'wild', value: w })
+  })
+
+  // shuffle
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[deck[i], deck[j]] = [deck[j], deck[i]]
+  }
+  return deck
+}
+
+export function label(card: Card) {
+  if (card.type === 'wild') return card.value
+  return `${card.color}${card.value}`
+}
+
+export function canPlay(card: Card, top: Card) {
+  if (card.type === 'wild') return true
+  if (top.type === 'wild') return true
+  if (card.color && top.color && card.color === top.color) return true
+  if (card.value === top.value) return true
+  return false
+}
+
+export function applyEffect(state: any, card: Card) {
+  // simplified effect application
+  if (card.type === 'action') {
+    if (card.value === 'D2') {
+      state.pendingDraw = (state.pendingDraw || 0) + 2
+    }
+    if (card.value === 'S') {
+      state.turn = (state.turn + state.dir + state.players.length) % state.players.length
+    }
+    if (card.value === 'R') {
+      state.dir = -state.dir
+    }
+  }
+  if (card.type === 'wild') {
+    if (card.value === 'W4') {
+      // only if allowed by rules
+      if (!state.rules || state.rules.wild4 !== false) {
+        state.pendingDraw = (state.pendingDraw || 0) + 4
+      }
+    }
+  }
+}
+
+export function nextTurn(state: any) {
+  state.turn = (state.turn + state.dir + state.players.length) % state.players.length
+}
+
+export function createGame(players: string[], rules = { stackD2: true }) {
+  const deck = makeDeck()
+  const playersState = players.map((p) => ({ id: p, hand: [] as Card[], isBot: p.startsWith('bot') }))
+  // deal 7
+  for (let i = 0; i < 7; i++) {
+    playersState.forEach((pl) => pl.hand.push(deck.pop()!))
+  }
+  // ensure first card non-wild
+  let top = deck.pop()!
+  while (top.type === 'wild') {
+    deck.unshift(top)
+    top = deck.pop()!
+  }
+  return {
+    players: playersState,
+    deck,
+    discard: [top],
+    turn: 0,
+    dir: 1,
+    started: true,
+    rules,
+    pendingDraw: 0
+  }
+}
+
+export function cssClass(card: Card) {
+  if (card.type === 'wild') return 'bg-gradient-to-br from-panel to-bg'
+  switch (card.color) {
+    case 'R':
+      return 'bg-red-600'
+    case 'G':
+      return 'bg-green-600'
+    case 'B':
+      return 'bg-blue-600'
+    case 'Y':
+      return 'bg-yellow-500 text-black'
+    default:
+      return 'bg-panel'
+  }
+}

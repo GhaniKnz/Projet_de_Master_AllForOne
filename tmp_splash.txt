@@ -1,0 +1,17 @@
+﻿import React from 'react'
+import { useNavigate } from 'react-router-dom'
+
+export default function Splash() {
+  const nav = useNavigate()
+  return (
+    <div className="h-full flex flex-col items-center justify-center">
+      <h1 className="text-3xl font-bold">PLAYER.ONE</h1>
+      <p className="text-muted mt-2">Modern PWA for players</p>
+      <div className="mt-6 flex gap-2">
+        <button onClick={() => nav('/auth')} className="px-3 py-2 bg-primary text-black rounded">Se connecter</button>
+        <button onClick={() => nav('/home')} className="px-3 py-2 bg-panel rounded">Continuer en invitÃ©</button>
+      </div>
+    </div>
+  )
+}
+
