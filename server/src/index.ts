@@ -39,6 +39,15 @@ app.use(cors(corsOptions))
 app.use(express.json({ limit: '1mb' }))
 app.use(morgan('dev'))
 
+app.get('/', (_req: Request, res: Response) => {
+  res.json({
+    message: 'AllForOne API',
+    status: 'ok',
+    docs: '/docs',
+    health: '/health'
+  })
+})
+
 app.get('/health', (_req: Request, res: Response) => res.json({ ok: true, uptime: process.uptime() }))
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
