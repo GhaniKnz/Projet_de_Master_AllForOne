@@ -1,6 +1,7 @@
 import { createServer } from 'http'
 import express from 'express'
-import cors from 'cors'
+import type { Request, Response } from 'express'
+import cors, { type CorsOptions } from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
 import dotenv from 'dotenv'
@@ -23,15 +24,22 @@ const app = express()
 const server = createServer(app)
 
 const PORT = Number(process.env.PORT || 8080)
-const ORIGIN = process.env.CORS_ORIGIN || '*'
+const rawOrigins = process.env.CORS_ORIGIN
+const allowedOrigins = rawOrigins
+  ? rawOrigins.split(',').map((origin) => origin.trim()).filter(Boolean)
+  : []
+const corsOptions: CorsOptions = {
+  origin: allowedOrigins.length === 0 ? true : allowedOrigins,
+  credentials: true
+}
 
 app.disable('x-powered-by')
 app.use(helmet({ crossOriginResourcePolicy: false }))
-app.use(cors({ origin: ORIGIN, credentials: true }))
+app.use(cors(corsOptions))
 app.use(express.json({ limit: '1mb' }))
 app.use(morgan('dev'))
 
-app.get('/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }))
+app.get('/health', (_req: Request, res: Response) => res.json({ ok: true, uptime: process.uptime() }))
 
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
@@ -44,7 +52,10 @@ app.use('/api/v1/feed', feedRouter)
 app.use('/api/v1/notifications', notificationsRouter)
 
 const io = new IOServer(server, {
-  cors: { origin: ORIGIN, credentials: true }
+  cors: {
+    origin: corsOptions.origin,
+    credentials: true
+  }
 })
 registerSocketHandlers(io)
 
@@ -52,7 +63,7 @@ async function bootstrap() {
   await Promise.all([connectMongo(), connectRedis()])
   server.listen(PORT, () => {
     // eslint-disable-next-line no-console
-    console.log(`AllForOne API ready on http://localhost:${PORT} (docs: /docs)`) 
+    console.log(`AllForOne API ready on http://localhost:${PORT} (docs: /docs)`)
   })
 }
 
@@ -61,8 +72,8 @@ bootstrap().catch((err) => {
   process.exit(1)
 })
 
-async function shutdown() {
-  console.log('Shutting down…')
+async function shutdown(): Promise<void> {
+  console.log('Shutting down...')
   await disconnectRedis().catch(() => null)
   await disconnectMongo().catch(() => null)
   process.exit(0)
@@ -70,4 +81,3 @@ async function shutdown() {
 
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
-

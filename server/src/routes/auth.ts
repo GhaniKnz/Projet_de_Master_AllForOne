@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { issueToken } from '../middleware/auth.js'
 
@@ -8,22 +9,20 @@ const GoogleAuthSchema = z.object({
   code: z.string().min(1)
 })
 
-// Mock endpoint: échanges OAuth seraient faits côté serveur
-authRouter.post('/google', (req, res) => {
+// Mock endpoint: OAuth exchange would normally be handled server-side.
+authRouter.post('/google', (req: Request, res: Response) => {
   const parse = GoogleAuthSchema.safeParse(req.body)
   if (!parse.success) return res.status(400).json({ error: 'Invalid payload' })
-  // Normalement: échange code -> token Google, récupération userinfo
-  // Ici: on émet un JWT applicatif pour un user de démo
+  // Normally: exchange code -> Google token, retrieve user information.
   const jwt = issueToken({ userId: 'demo-user', displayName: 'Demo' })
   return res.json({ accessToken: jwt })
 })
 
-authRouter.post('/refresh', (_req, res) => {
+authRouter.post('/refresh', (_req: Request, res: Response) => {
   const jwt = issueToken({ userId: 'demo-user', displayName: 'Demo' })
   return res.json({ accessToken: jwt })
 })
 
-authRouter.post('/logout', (_req, res) => {
+authRouter.post('/logout', (_req: Request, res: Response) => {
   return res.json({ ok: true })
 })
-

@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import type { Request, Response } from 'express'
 
 export const gamesRouter = Router()
 
@@ -16,19 +17,18 @@ const CATALOG = [
     name: 'UNO No Mercy',
     playerRange: [2, 6],
     modes: ['realtime'],
-    summary: 'Variante compétitive',
+    summary: 'Variante competitive',
     highlight: '+6/+10 & 7-0'
   },
   {
     id: 'derocher',
-    name: 'Dérocher',
+    name: 'Derocher',
     playerRange: [2, 4],
     modes: ['realtime', 'turn-based'],
-    summary: 'Adresse et stratégie'
+    summary: 'Adresse et strategie'
   }
 ]
 
-gamesRouter.get('/', (_req, res) => {
+gamesRouter.get('/', (_req: Request, res: Response) => {
   return res.json({ items: CATALOG })
 })
-

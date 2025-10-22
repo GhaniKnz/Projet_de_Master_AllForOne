@@ -1,9 +1,9 @@
 import { Router } from 'express'
+import type { Request, Response } from 'express'
 import { z } from 'zod'
 import { requireAuth } from '../middleware/auth.js'
 import { SessionModel, toClientSession } from '../models/session.js'
 import { getRedis } from '../config/redis.js'
-import { randomUUID } from 'crypto'
 
 export const sessionsRouter = Router()
 
@@ -16,7 +16,10 @@ const CreateSchema = z.object({
   options: z.record(z.any()).optional()
 })
 
-sessionsRouter.get('/', async (req, res) => {
+type SessionsListRequest = Request<unknown, unknown, unknown, { gameId?: string }>
+type SessionIdRequest = Request<{ id: string }>
+
+sessionsRouter.get('/', async (req: SessionsListRequest, res: Response) => {
   const gameId = (req.query.gameId as string) || ''
   if (!gameId) return res.json({ items: [] })
   const redis = getRedis()
@@ -31,16 +34,16 @@ sessionsRouter.get('/', async (req, res) => {
   return res.json({ items })
 })
 
-sessionsRouter.get('/:id', async (req, res) => {
+sessionsRouter.get('/:id', async (req: SessionIdRequest, res: Response) => {
   const doc = await SessionModel.findById(req.params.id).lean()
   if (!doc) return res.status(404).json({ error: 'Not found' })
   return res.json({ id: doc._id.toString(), ...doc })
 })
 
-sessionsRouter.post('/', requireAuth, async (req, res) => {
+sessionsRouter.post('/', requireAuth, async (req: Request, res: Response) => {
   const parsed = CreateSchema.safeParse(req.body)
   if (!parsed.success) return res.status(400).json({ error: 'Invalid payload' })
-  const auth = (req as any).auth
+  const auth = req.auth!
   const sessionDoc = await SessionModel.create({
     ...parsed.data,
     title: parsed.data.title || 'Partie entre amis',
@@ -60,8 +63,8 @@ sessionsRouter.post('/', requireAuth, async (req, res) => {
   return res.status(201).json(toClientSession(sessionDoc))
 })
 
-sessionsRouter.post('/:id/join', requireAuth, async (req, res) => {
-  const auth = (req as any).auth
+sessionsRouter.post('/:id/join', requireAuth, async (req: SessionIdRequest, res: Response) => {
+  const auth = req.auth!
   const session = await SessionModel.findById(req.params.id)
   if (!session) return res.status(404).json({ error: 'Not found' })
   if (session.players.find((p) => p.id === auth.userId)) {
@@ -76,8 +79,8 @@ sessionsRouter.post('/:id/join', requireAuth, async (req, res) => {
   return res.json(toClientSession(session))
 })
 
-sessionsRouter.post('/:id/ready', requireAuth, async (req, res) => {
-  const auth = (req as any).auth
+sessionsRouter.post('/:id/ready', requireAuth, async (req: SessionIdRequest, res: Response) => {
+  const auth = req.auth!
   const session = await SessionModel.findById(req.params.id)
   if (!session) return res.status(404).json({ error: 'Not found' })
   session.players = session.players.map((player) =>
@@ -90,7 +93,7 @@ sessionsRouter.post('/:id/ready', requireAuth, async (req, res) => {
   return res.json(toClientSession(session))
 })
 
-sessionsRouter.post('/:id/start', requireAuth, async (req, res) => {
+sessionsRouter.post('/:id/start', requireAuth, async (req: SessionIdRequest, res: Response) => {
   const session = await SessionModel.findById(req.params.id)
   if (!session) return res.status(404).json({ error: 'Not found' })
   session.status = 'in-game'
@@ -112,4 +115,3 @@ function generateAccessCode() {
   for (let i = 0; i < 4; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)]
   return code
 }
-
