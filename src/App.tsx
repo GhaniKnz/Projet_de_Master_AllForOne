@@ -12,6 +12,7 @@ const Messages = lazy(() => import('./routes/Messages'))
 const Notifications = lazy(() => import('./routes/Notifications'))
 const Boutique = lazy(() => import('./routes/Boutique'))
 const Search = lazy(() => import('./routes/Search'))
+const Settings = lazy(() => import('./routes/Settings'))
 
 const UnoLobby = lazy(() => import('./games/uno/Lobby'))
 const UnoGame = lazy(() => import('./games/uno/UI'))
@@ -33,9 +34,11 @@ export default function App() {
             <Route path="/channels" element={<Channels />} />
             <Route path="/messages/:id" element={<Messages />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/profile/:username" element={<Profile />} />
             <Route path="/boutique" element={<Boutique />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/recherche" element={<Search />} />
+            <Route path="/settings" element={<Settings />} />
           </Route>
 
           <Route path="/uno/lobby" element={<UnoLobby />} />

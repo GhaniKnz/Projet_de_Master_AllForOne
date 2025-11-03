@@ -1,23 +1,23 @@
-import React from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Gamepad2, MessageCircleHeart, Sparkles, Users } from 'lucide-react'
-import { useAppStore } from '../store/app'
+import { useNavigate } from "react-router-dom"
+import { Gamepad2, MessageCircleHeart, Sparkles, Users } from "lucide-react"
+import { useAppStore } from "../store/app"
+import { api } from "../lib/api"
 
 const features = [
   {
     icon: <MessageCircleHeart className="h-5 w-5" />,
-    title: 'Discussions instantanées',
-    description: 'Chats privés, salons publics et réactions en direct.'
+    title: "Instant discussions",
+    description: "Private chats, public rooms and live reactions."
   },
   {
     icon: <Users className="h-5 w-5" />,
-    title: 'Communauté soudée',
-    description: 'Retrouvez vos amis ou découvrez de nouveaux coéquipiers.'
+    title: "Community first",
+    description: "Find your squad or meet new teammates in seconds."
   },
   {
     icon: <Sparkles className="h-5 w-5" />,
-    title: 'Progression motivante',
-    description: 'Classements, badges exclusifs et boutique premium.'
+    title: "Motivating progression",
+    description: "Leaderboards, exclusive badges and a premium store."
   }
 ]
 
@@ -26,15 +26,16 @@ export default function Splash() {
   const enterAsGuest = useAppStore((state) => state.enterAsGuest)
 
   const handleGuest = () => {
-    enterAsGuest('Invité')
-    navigate('/home')
+    api.logout()
+    enterAsGuest("Guest")
+    navigate("/home")
   }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-between bg-gradient-to-b from-white to-bg px-6 py-10 text-center">
       <header className="flex w-full max-w-xl items-center justify-between text-sm text-muted">
         <span>AllForOne</span>
-        <span>Version Preview</span>
+        <span>Preview build</span>
       </header>
 
       <div className="flex w-full max-w-xl flex-col items-center gap-6">
@@ -42,11 +43,10 @@ export default function Splash() {
           <Gamepad2 className="h-8 w-8" />
         </div>
         <div>
-          <p className="text-[13px] font-semibold uppercase tracking-[0.4em] text-muted">Jouez. Discutez. Connectez.</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-txt">La plateforme qui réunit jeux et social</h1>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.4em] text-muted">Play. Chat. Connect.</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-txt">The social hub for your favorite games</h1>
           <p className="mt-4 text-base text-muted">
-            Retrouver vos amis autour de vos jeux préférés, partager vos moments forts et progressez ensemble, le tout dans une
-            expérience inspirée du design Apple.
+            Join your friends, start games in seconds and share highlights in an experience inspired by premium mobile design.
           </p>
         </div>
         <div className="flex w-full flex-col gap-3 sm:flex-row">
@@ -54,13 +54,13 @@ export default function Splash() {
             onClick={() => navigate('/auth')}
             className="w-full rounded-2xl bg-primary py-3 text-base font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring"
           >
-            Se connecter / Créer un compte
+            Log in / Create account
           </button>
           <button
             onClick={handleGuest}
             className="w-full rounded-2xl border border-border/70 bg-surface py-3 text-base font-semibold text-txt transition hover:border-primary/50 focus-ring"
           >
-            Explorer en invité
+            Explore as guest
           </button>
         </div>
       </div>

@@ -5,8 +5,12 @@ import cors, { type CorsOptions } from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
 import dotenv from 'dotenv'
+import fs from 'fs'
+import path from 'path'
 import { Server as IOServer } from 'socket.io'
+import { fileURLToPath } from 'url'
 import { registerSocketHandlers } from './realtime/socket.js'
+import { bindSocketServer } from './realtime/events.js'
 import { authRouter } from './routes/auth.js'
 import { gamesRouter } from './routes/games.js'
 import { sessionsRouter } from './routes/sessions.js'
@@ -17,8 +21,38 @@ import { notificationsRouter } from './routes/notifications.js'
 import { swaggerUi, swaggerSpec } from './swagger.js'
 import { connectMongo, disconnectMongo } from './config/mongo.js'
 import { connectRedis, disconnectRedis } from './config/redis.js'
+import { seedInitialData } from './config/seed.js'
 
-dotenv.config()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+
+function loadEnvironment() {
+  const candidates = [
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '..', '.env'),
+    path.resolve(__dirname, '.env'),
+    path.resolve(__dirname, '../.env'),
+    path.resolve(__dirname, '../../.env')
+  ]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      dotenv.config({ path: candidate })
+      return
+    }
+  }
+
+  // fallback: default behaviour (maybe env variables already injected)
+  dotenv.config()
+}
+
+loadEnvironment()
+
+if (!process.env.GOOGLE_CLIENT_ID) {
+  console.warn('GOOGLE_CLIENT_ID not set. Google sign-in will return 503 until configured.')
+} else {
+  console.log('Google OAuth client configured.')
+}
 
 const app = express()
 const server = createServer(app)
@@ -67,9 +101,13 @@ const io = new IOServer(server, {
   }
 })
 registerSocketHandlers(io)
+bindSocketServer(io)
 
 async function bootstrap() {
   await Promise.all([connectMongo(), connectRedis()])
+  await seedInitialData().catch((err) => {
+    console.error('Seeding failed', err)
+  })
   server.listen(PORT, () => {
     // eslint-disable-next-line no-console
     console.log(`AllForOne API ready on http://localhost:${PORT} (docs: /docs)`)
@@ -90,3 +128,4 @@ async function shutdown(): Promise<void> {
 
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
+

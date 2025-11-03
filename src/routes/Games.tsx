@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Flame, Users, Clock, Sparkles, Star, StarOff, Search, Plus, Settings2, ShieldCheck } from 'lucide-react'
 import Card from '../components/Card'
@@ -77,20 +77,24 @@ export default function Games() {
     api.listSessions(selectedGameId).then((res) => setRemoteSessions(res.items)).catch(() => setRemoteSessions([]))
   }, [remote, selectedGameId])
 
-  const effectiveCatalog = remote ? (remoteCatalog || []) : catalog
+  const effectiveCatalog = remote ? (remoteCatalog && remoteCatalog.length ? remoteCatalog : catalog) : catalog
 
   const filteredCatalog = React.useMemo(() => {
     const term = search.trim().toLowerCase()
     return effectiveCatalog.filter((game) => {
+      const categoriesList = Array.isArray(game.categories) ? game.categories : []
+      const tagsList = Array.isArray(game.tags) ? game.tags : []
+      const name = typeof game.name === 'string' ? game.name : ''
+      const summary = typeof game.summary === 'string' ? game.summary : ''
       const matchesCategory =
         category === DEFAULT_CATEGORY ||
-        game.categories.includes(category) ||
-        game.tags.includes(category)
+        categoriesList.includes(category) ||
+        tagsList.includes(category)
       const matchesSearch =
         term.length === 0 ||
-        game.name.toLowerCase().includes(term) ||
-        game.summary.toLowerCase().includes(term) ||
-        game.tags.some((tag) => tag.toLowerCase().includes(term))
+        name.toLowerCase().includes(term) ||
+        summary.toLowerCase().includes(term) ||
+        tagsList.some((tag) => typeof tag === 'string' && tag.toLowerCase().includes(term))
       return matchesCategory && matchesSearch
     })
   }, [effectiveCatalog, category, search])
@@ -108,25 +112,38 @@ export default function Games() {
 
   React.useEffect(() => {
     if (!selectedGame) return
+    const defaults = (selectedGame.defaultOptions ?? {}) as Record<string, unknown>
+    const availableModes = Array.isArray(selectedGame.modes) && selectedGame.modes.length > 0 ? selectedGame.modes : ['realtime']
+    const visibility = (defaults.visibility as SessionType) ?? 'public'
+    const defaultMode = (defaults.mode as SessionMode) ?? (availableModes[0] as SessionMode)
     setCreationState({
       title: `${selectedGame.name} entre amis`,
-      sessionType: selectedGame.defaultOptions.visibility ?? 'public',
-      mode: selectedGame.defaultOptions.mode ?? selectedGame.modes[0],
-      allowBots: selectedGame.defaultOptions.allowBots ?? false,
-      allowStacking: selectedGame.defaultOptions.allowStacking ?? false,
-      allowWildChallenge: selectedGame.defaultOptions.allowWildChallenge ?? false,
-      timerPerTurn: selectedGame.defaultOptions.timerPerTurn ?? 20
+      sessionType: visibility,
+      mode: defaultMode,
+      allowBots: Boolean(defaults.allowBots),
+      allowStacking: Boolean(defaults.allowStacking),
+      allowWildChallenge: Boolean(defaults.allowWildChallenge),
+      timerPerTurn: typeof defaults.timerPerTurn === 'number' ? (defaults.timerPerTurn as number) : 20
     })
   }, [selectedGame])
 
+  const selectedGameKey = selectedGame?.id ?? ''
   const sessionsForGame = React.useMemo(
-    () => (remote ? (remoteSessions || []) : sessions.filter((session) => session.gameId === selectedGame?.id)),
-    [remote, remoteSessions, sessions, selectedGame]
+    () =>
+      remote
+        ? remoteSessions && remoteSessions.length
+          ? remoteSessions
+          : sessions.filter((session) => session.gameId === selectedGameKey)
+        : sessions.filter((session) => session.gameId === selectedGameKey),
+    [remote, remoteSessions, sessions, selectedGameKey]
   )
 
   const handleQuickPlay = async (gameId: GameId) => {
     if (remote) {
-      await api.ensureDemoToken()
+      if (!api.isAuthenticated()) {
+        navigate('/auth')
+        return
+      }
       const current = getCurrentUser()
       if (current) setLocalPlayerId(current.userId)
       // Try to join first waiting session, else create
@@ -152,7 +169,10 @@ export default function Games() {
   const handleCreateSession = async () => {
     if (!selectedGame || !creationState) return
     if (remote) {
-      await api.ensureDemoToken()
+      if (!api.isAuthenticated()) {
+        navigate('/auth')
+        return
+      }
       const current = getCurrentUser()
       if (current) setLocalPlayerId(current.userId)
       const session = await api.createSession({
@@ -260,6 +280,10 @@ export default function Games() {
         {filteredCatalog.map((game) => {
           const isSelected = game.id === selectedGame.id
           const isFavorite = favorites.includes(game.id)
+          const categoriesLabel = (Array.isArray(game.categories) ? game.categories : []).join(' / ')
+          const tagList = Array.isArray(game.tags) ? game.tags : []
+          const playerRange = Array.isArray(game.playerRange) && game.playerRange.length >= 2 ? game.playerRange : [1, 4]
+          const durationHint = typeof game.durationHint === 'string' ? game.durationHint : '15 min'
           return (
             <Card
               key={game.id}
@@ -269,7 +293,7 @@ export default function Games() {
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-muted">{game.categories.join(' / ')}</p>
+                  <p className="text-xs uppercase tracking-[0.3em] text-muted">{categoriesLabel}</p>
                   <h2 className="mt-1 text-lg font-semibold text-txt">{game.name}</h2>
                 </div>
                 <button
@@ -287,11 +311,11 @@ export default function Games() {
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
                 <span className="flex items-center gap-1">
                   <Users className="h-4 w-4" />
-                  {game.playerRange[0]}-{game.playerRange[1]} joueurs
+                  {playerRange[0]}-{playerRange[1]} joueurs
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
-                  {game.durationHint}
+                  {durationHint}
                 </span>
                 {game.highlight ? (
                   <span className="flex items-center gap-1">
@@ -321,7 +345,7 @@ export default function Games() {
             </button>
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-muted">
-            {selectedGame.tags.map((tag) => (
+            {(Array.isArray(selectedGame.tags) ? selectedGame.tags : []).map((tag) => (
               <span key={tag} className="rounded-full bg-primary/10 px-3 py-1 text-primary">
                 #{tag}
               </span>
@@ -346,38 +370,44 @@ export default function Games() {
           <Card className="text-sm text-muted">Aucune session pour le moment. Lancez la premiere.</Card>
         ) : (
           <div className="space-y-3">
-            {sessionsForGame.map((session) => (
-              <Card key={session.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-txt">{session.title}</p>
-                  <p className="text-xs text-muted">
-                    {session.players.length}/{session.maxPlayers} joueurs · {renderSessionType(session.type)} ·{' '}
-                    {session.mode === 'realtime' ? 'Temps reel' : 'Tour par tour'}
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
-                    {session.options.allowStacking ? <TagPill label="Stack +2" /> : null}
-                    {session.options.allowWildChallenge ? <TagPill label="Challenge +4" /> : null}
-                    {session.options.allowBots ? <TagPill label="Bots autorises" /> : null}
-                    {session.options.timerPerTurn ? <TagPill label={`${session.options.timerPerTurn}s par tour`} /> : null}
-                    {session.options.visibility === 'ranked' ? <TagPill label="Classe" /> : null}
+            {sessionsForGame.map((session) => {
+              const pills: React.ReactNode[] = []
+              if (session.options?.allowStacking) pills.push(<TagPill key={`${session.id}-stack`} label="Stack +2" />)
+              if (session.options?.allowWildChallenge) pills.push(<TagPill key={`${session.id}-challenge`} label="Challenge +4" />)
+              if (session.options?.allowBots) pills.push(<TagPill key={`${session.id}-bots`} label="Bots autorises" />)
+              if (typeof session.options?.timerPerTurn === 'number') {
+                pills.push(<TagPill key={`${session.id}-timer`} label={`${session.options.timerPerTurn}s par tour`} />)
+              }
+              if (session.options?.visibility === 'ranked' || session.type === 'ranked') {
+                pills.push(<TagPill key={`${session.id}-ranked`} label="Classe" />)
+              }
+              return (
+                <Card key={session.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-txt">{session.title}</p>
+                    <p className="text-xs text-muted">
+                      {session.players.length}/{session.maxPlayers} joueurs - {renderSessionType(session.type)} -{' '}
+                      {session.mode === 'realtime' ? 'Temps reel' : 'Tour par tour'}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">{pills}</div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setShowSessionSheet(session)}
-                    className="rounded-2xl border border-border/60 px-4 py-2 text-xs font-semibold text-muted transition hover:border-primary/50 hover:text-primary focus-ring"
-                  >
-                    Details
-                  </button>
-                  <button
-                    onClick={() => handleJoinSession(session)}
-                    className="rounded-2xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring"
-                  >
-                    Rejoindre
-                  </button>
-                </div>
-              </Card>
-            ))}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowSessionSheet(session)}
+                      className="rounded-2xl border border-border/60 px-4 py-2 text-xs font-semibold text-muted transition hover:border-primary/50 hover:text-primary focus-ring"
+                    >
+                      Details
+                    </button>
+                    <button
+                      onClick={() => handleJoinSession(session)}
+                      className="rounded-2xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring"
+                    >
+                      Rejoindre
+                    </button>
+                  </div>
+                </Card>
+              )
+            })}
           </div>
         )}
       </section>
@@ -387,7 +417,7 @@ export default function Games() {
           state={creationState}
           setState={setCreationState}
           gameId={selectedGame.id}
-          modes={selectedGame.modes}
+          modes={Array.isArray(selectedGame.modes) && selectedGame.modes.length ? selectedGame.modes : ['realtime']}
           onCreate={handleCreateSession}
           onCancel={() => setShowCreation(false)}
         />
@@ -557,6 +587,13 @@ function SessionDetailsSheet({
   onClose: () => void
   onJoin: () => void
 }) {
+  const optionLabels: string[] = []
+  if (session.options.allowStacking) optionLabels.push('Stack +2')
+  if (session.options.allowWildChallenge) optionLabels.push('Challenge +4')
+  if (session.options.allowBots) optionLabels.push('Bots autorises')
+  if (typeof session.options.timerPerTurn === 'number') optionLabels.push(`Timer ${session.options.timerPerTurn}s`)
+  if (session.type === 'ranked' || session.options.visibility === 'ranked') optionLabels.push('Classe')
+
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-900/30 backdrop-blur-sm md:items-center">
       <div className="absolute inset-0" onClick={onClose} aria-hidden />
@@ -569,12 +606,12 @@ function SessionDetailsSheet({
           <ShieldCheck className="h-5 w-5 text-primary" />
         </div>
         <p className="mt-2 text-sm text-muted">
-          {session.players.length}/{session.maxPlayers} joueurs · {renderSessionType(session.type)} ·{' '}
+          {session.players.length}/{session.maxPlayers} joueurs - {renderSessionType(session.type)} -{' '}
           {session.mode === 'realtime' ? 'Temps reel' : 'Tour par tour'}
         </p>
         <div className="mt-4 space-y-2 text-sm text-muted">
           {session.accessCode ? <p>Code: {session.accessCode}</p> : null}
-          <p>Options: {session.options.allowStacking ? 'Stack +2, ' : ''}{session.options.allowWildChallenge ? 'Challenge +4, ' : ''}{session.options.allowBots ? 'Bots autorises, ' : ''}Timer {session.options.timerPerTurn}s</p>
+          <p>Options: {optionLabels.length ? optionLabels.join(' - ') : 'Configuration standard'}</p>
         </div>
         <div className="mt-4 flex flex-col gap-2">
           <button
@@ -644,3 +681,6 @@ function Toggle({
     </button>
   )
 }
+
+
+

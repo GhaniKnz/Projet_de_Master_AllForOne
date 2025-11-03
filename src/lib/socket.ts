@@ -8,12 +8,22 @@ export function getSocket(): Socket | null {
   if (socket) return socket
   const base = (import.meta as any).env?.VITE_API_URL
   if (!base) return null
-  socket = io(base, {
-    transports: ['websocket'],
-    auth: {
-      token: getStoredToken() || undefined
-    }
-  })
+  try {
+    socket = io(base, {
+      transports: ['websocket'],
+      auth: {
+        token: getStoredToken() || undefined
+      },
+      autoConnect: true
+    })
+    socket.on('connect_error', () => {
+      // Leave handling to the stores which may decide to fall back to offline mode.
+    })
+  } catch (err) {
+    console.warn('Socket initialization failed', err)
+    socket = null
+    return null
+  }
   return socket
 }
 
@@ -23,4 +33,3 @@ export function disconnectSocket() {
     socket = null
   }
 }
-
