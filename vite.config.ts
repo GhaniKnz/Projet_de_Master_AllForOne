@@ -22,7 +22,9 @@ export default defineConfig({
         ]
       },
       workbox: {
-        navigateFallback: '/offline.html'
+        navigateFallback: '/offline.html',
+        skipWaiting: true,
+        clientsClaim: true
       }
     })
   ],
