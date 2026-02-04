@@ -8,6 +8,16 @@ import { api, isBackendConfigured, getCurrentUser } from '../lib/api'
 import { useAppStore } from '../store/app'
 import { buildSessionPlayer } from '../utils/sessionPlayer'
 
+// Images par défaut pour les jeux
+const getDefaultGameImage = (gameId: string): string => {
+  const defaultImages: Record<string, string> = {
+    uno: '/uno_card.png',
+    'uno-no-mercy': '/uno_no_mercy_card.png',
+    derocher: 'https://images.unsplash.com/photo-1611996575749-79a3a250f948?w=400&h=300&fit=crop'
+  }
+  return defaultImages[gameId] || 'https://images.unsplash.com/photo-1612287230202-1ff1d85d1bdf?w=400&h=300&fit=crop'
+}
+
 type CreationState = {
   title: string
   sessionType: SessionType
@@ -220,6 +230,41 @@ export default function Games() {
     }
   }
 
+  const handleRejoinSession = async (session: GameSession) => {
+    if (remote) {
+      if (!api.isAuthenticated()) {
+        navigate('/auth')
+        return
+      }
+      const current = getCurrentUser()
+      if (current) setLocalPlayerId(current.userId)
+      try {
+        const rejoined = await api.rejoinSession(session.id)
+        if (rejoined) {
+          setActiveSession(rejoined.id)
+          // If game is in progress, go directly to game, not lobby
+          if (rejoined.status === 'in-game') {
+            routeToGame(rejoined, navigate)
+          } else {
+            routeToLobby(rejoined, navigate)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to rejoin session:', err)
+        // Fallback: try regular join
+        handleJoinSession(session)
+      }
+      return
+    }
+    // Local mode: if game is in progress, go directly to game
+    setActiveSession(session.id)
+    if (session.status === 'in-game') {
+      routeToGame(session, navigate)
+    } else {
+      routeToLobby(session, navigate)
+    }
+  }
+
   const toggleFavorite = (gameId: GameId) => {
     if (favorites.includes(gameId)) unmarkFavorite(gameId)
     else markFavorite(gameId)
@@ -236,19 +281,19 @@ export default function Games() {
 
   return (
     <div className="space-y-6 pb-12">
-      <section className="rounded-3xl border border-border/70 bg-gradient-to-br from-primary/10 via-white to-accent/10 p-6 shadow-card">
+      <section className="rounded-3xl border border-border/70 bg-gradient-to-br from-primary/10 via-white to-accent/10 p-5 shadow-card">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-2">
+          <div className="space-y-2 flex-1 min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-primary">Jouer ensemble</p>
-            <h1 className="text-2xl font-semibold text-txt">Des parties sociales en un tap</h1>
-            <p className="text-sm text-muted">
+            <h1 className="text-xl font-semibold text-txt">Des parties sociales en un tap</h1>
+            <p className="text-sm text-muted leading-relaxed">
               Lancez un match rapide avec la communaute, creez un salon prive ou grimpez le classement en mode
               classe. Les parametres sont adaptes a chaque jeu.
             </p>
           </div>
           <button
             onClick={() => handleQuickPlay(selectedGame.id)}
-            className="flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring"
+            className="flex-shrink-0 flex items-center gap-2 rounded-2xl bg-primary px-5 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring"
           >
             <Flame className="h-5 w-5" />
             Match rapide
@@ -256,24 +301,40 @@ export default function Games() {
         </div>
       </section>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-xs">
+      {/* Search & Filter Section - Mobile optimized */}
+      <div className="space-y-4">
+        {/* Search bar with icon */}
+        <div className="relative">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             type="search"
-            placeholder="Rechercher un jeu"
-            className="w-full rounded-2xl border border-border/60 bg-surface py-3 pl-11 pr-4 text-sm text-txt placeholder:text-muted focus:border-primary focus:outline-none"
+            placeholder="Rechercher un jeu..."
+            className="w-full rounded-2xl border border-border/60 bg-surface py-3.5 pl-11 pr-4 text-sm text-txt placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
           />
         </div>
-        <Tabs
-          items={categories.map((cat) => (cat === DEFAULT_CATEGORY ? 'Tout' : formatCategory(cat)))}
-          current={category === DEFAULT_CATEGORY ? 'Tout' : formatCategory(category)}
-          onChange={(label) => {
-            setCategory(label === 'Tout' ? DEFAULT_CATEGORY : categories.find((cat) => formatCategory(cat) === label) ?? DEFAULT_CATEGORY)
-          }}
-        />
+        
+        {/* Category chips - horizontally scrollable */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
+          {categories.map((cat) => {
+            const label = cat === DEFAULT_CATEGORY ? 'Tout' : formatCategory(cat)
+            const isActive = category === cat
+            return (
+              <button
+                key={cat}
+                onClick={() => setCategory(cat)}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all active:scale-95 ${
+                  isActive 
+                    ? 'bg-primary text-white shadow-md shadow-primary/25' 
+                    : 'bg-surface border border-border/60 text-muted hover:border-primary/40 hover:text-txt'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -284,45 +345,59 @@ export default function Games() {
           const tagList = Array.isArray(game.tags) ? game.tags : []
           const playerRange = Array.isArray(game.playerRange) && game.playerRange.length >= 2 ? game.playerRange : [1, 4]
           const durationHint = typeof game.durationHint === 'string' ? game.durationHint : '15 min'
+          const gameImage = game.imageUrl || getDefaultGameImage(game.id)
           return (
             <Card
               key={game.id}
               onClick={() => setSelectedGameId(game.id)}
               ariaLabel={`Afficher ${game.name}`}
-              className={`flex flex-col gap-3 ${isSelected ? 'border-primary/50 shadow-card' : ''}`}
+              className={`flex flex-col gap-0 overflow-hidden p-0 ${isSelected ? 'border-primary/50 shadow-card ring-2 ring-primary/30' : ''}`}
             >
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-muted">{categoriesLabel}</p>
-                  <h2 className="mt-1 text-lg font-semibold text-txt">{game.name}</h2>
-                </div>
+              {/* Game Image */}
+              <div className="relative aspect-[4/3] w-full overflow-hidden">
+                <img 
+                  src={gameImage}
+                  alt={game.name}
+                  className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                {/* Favorite button */}
                 <button
-                  className="rounded-full border border-border/60 p-2 text-muted transition hover:text-primary focus-ring"
+                  className="absolute right-4 top-4 rounded-full bg-white/20 backdrop-blur-sm p-3 text-white transition hover:bg-white/30 focus-ring"
                   aria-label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                   onClick={(event) => {
                     event.stopPropagation()
                     toggleFavorite(game.id)
                   }}
                 >
-                  {isFavorite ? <Star className="h-4 w-4 text-primary" /> : <StarOff className="h-4 w-4" />}
+                  {isFavorite ? <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" /> : <StarOff className="h-5 w-5" />}
                 </button>
+                {/* Game name overlay */}
+                <div className="absolute bottom-0 left-0 right-0 p-5">
+                  <p className="text-sm uppercase tracking-[0.2em] text-white/80">{categoriesLabel}</p>
+                  <h2 className="text-2xl font-bold text-white mt-1">{game.name}</h2>
+                </div>
               </div>
-              <p className="text-sm text-muted">{game.summary}</p>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
-                <span className="flex items-center gap-1">
-                  <Users className="h-4 w-4" />
-                  {playerRange[0]}-{playerRange[1]} joueurs
-                </span>
-                <span className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  {durationHint}
-                </span>
-                {game.highlight ? (
-                  <span className="flex items-center gap-1">
-                    <Sparkles className="h-4 w-4 text-accent" />
-                    {game.highlight}
+              
+              {/* Game info */}
+              <div className="p-5 space-y-4">
+                <p className="text-base text-muted line-clamp-2">{game.summary}</p>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
+                  <span className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-1.5 rounded-full">
+                    <Users className="h-4 w-4" />
+                    {playerRange[0]}-{playerRange[1]}
                   </span>
-                ) : null}
+                  <span className="flex items-center gap-1.5 bg-accent/10 text-accent px-3 py-1.5 rounded-full">
+                    <Clock className="h-4 w-4" />
+                    {durationHint}
+                  </span>
+                  {game.highlight ? (
+                    <span className="flex items-center gap-1.5 bg-yellow-500/10 text-yellow-600 px-3 py-1.5 rounded-full">
+                      <Sparkles className="h-4 w-4" />
+                      {game.highlight}
+                    </span>
+                  ) : null}
+                </div>
               </div>
             </Card>
           )
@@ -354,6 +429,38 @@ export default function Games() {
           <p className="text-sm text-muted">{selectedGame.description}</p>
         </Card>
       ) : null}
+
+      {/* Active games section - Games you can rejoin */}
+      {sessionsForGame.filter((s) => s.status === 'in-game' && s.players.some((p) => p.id === user?.id)).length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">🎮 Vos parties en cours</h2>
+          </div>
+          <div className="space-y-3">
+            {sessionsForGame
+              .filter((s) => s.status === 'in-game' && s.players.some((p) => p.id === user?.id))
+              .map((session) => (
+                <Card key={session.id} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-accent/30 bg-accent/5">
+                  <div>
+                    <p className="text-sm font-semibold text-txt flex items-center gap-2">
+                      {session.title}
+                      <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">En cours</span>
+                    </p>
+                    <p className="text-xs text-muted">
+                      {session.players.length}/{session.maxPlayers} joueurs - {session.mode === 'realtime' ? 'Temps reel' : 'Tour par tour'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleRejoinSession(session)}
+                    className="rounded-2xl bg-accent px-4 py-2 text-xs font-semibold text-white shadow-card transition hover:bg-accent/90 focus-ring"
+                  >
+                    Rejoindre à nouveau
+                  </button>
+                </Card>
+              ))}
+          </div>
+        </section>
+      )}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between">
@@ -463,6 +570,20 @@ function routeToLobby(session: GameSession, navigate: ReturnType<typeof useNavig
     return
   }
   navigate('/games')
+}
+
+function routeToGame(session: GameSession, navigate: ReturnType<typeof useNavigate>) {
+  const state = { session }
+  if (session.gameId === 'uno' || session.gameId === 'uno-no-mercy') {
+    navigate(`/uno/game?session=${session.id}`, { state })
+    return
+  }
+  if (session.gameId === 'derocher') {
+    navigate(`/derocher/game?session=${session.id}`, { state })
+    return
+  }
+  // Fallback to lobby if game route unknown
+  routeToLobby(session, navigate)
 }
 
 function updateRemoteSessions(prev: any[] | null, session: any) {

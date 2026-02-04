@@ -192,6 +192,69 @@ export type AuthUser = {
   friends: string[]
 }
 
+export type Trophy = {
+  id: string
+  name: string
+  description: string
+  icon: string
+  category: 'general' | 'uno' | 'social' | 'achievement' | 'rare' | 'legendary'
+  xpReward: number
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'
+}
+
+export type TrophyWithStatus = Trophy & {
+  unlocked: boolean
+  unlockedAt: string | null
+}
+
+export type GameEndResult = {
+  ok: boolean
+  xpGained: number
+  totalXp: number
+  level: number
+  leveledUp: boolean
+  currentWinStreak: number
+  bestWinStreak: number
+  newTrophies: Array<{ id: string; name: string; icon: string; xpReward: number }>
+  progression: {
+    xp: number
+    level: number
+    nextLevelAt: number
+    progressToNext: number
+    xpForNext: number
+  }
+}
+
+export type GameStats = {
+  gameId: string
+  gamesPlayed: number
+  wins: number
+  losses: number
+  cardsPlayed: number
+  unoCalls: number
+  lastPlayedAt?: string
+}
+
+export type UserDetailedStats = {
+  totalGamesPlayed: number
+  totalWins: number
+  totalLosses: number
+  winRate: string
+  currentWinStreak?: number
+  bestWinStreak: number
+  favoriteGame?: string
+  xp: number
+  level: number
+  gameStats: GameStats[]
+  progression?: {
+    xp: number
+    level: number
+    nextLevelAt: number
+    progressToNext: number
+    xpForNext: number
+  }
+}
+
 type AuthResponse = {
   accessToken: string
   user: AuthUser
@@ -212,6 +275,8 @@ export const api = {
   },
   logout() {
     clearToken()
+    // Disconnect socket when logging out
+    import('./socket').then(({ disconnectSocket }) => disconnectSocket())
   },
   register(payload: { email: string; password: string; displayName: string }) {
     return request<AuthResponse>('POST', '/api/v1/auth/register', payload).then(storeAuthResponse)
@@ -289,6 +354,9 @@ export const api = {
   joinSession(id: string) {
     return request<any>('POST', `/api/v1/sessions/${id}/join`, {}, true)
   },
+  rejoinSession(id: string) {
+    return request<any>('POST', `/api/v1/sessions/${id}/rejoin`, {}, true)
+  },
   toggleReady(id: string) {
     return request<any>('POST', `/api/v1/sessions/${id}/ready`, {}, true)
   },
@@ -346,6 +414,37 @@ export const api = {
   },
   createSessionFromConversation(id: string, payload: { gameId: string; title?: string; type?: string; mode?: string; maxPlayers?: number; options?: Record<string, unknown> }) {
     return request<{ session: any; message: ChatMessage }>('POST', `/api/v1/conversations/${id}/create-session`, payload, true)
+  },
+  // Trophies
+  getAllTrophies() {
+    return request<{ items: Trophy[] }>('GET', '/api/v1/trophies')
+  },
+  getMyTrophies() {
+    return request<{ items: TrophyWithStatus[]; unlockedCount: number; totalCount: number }>('GET', '/api/v1/trophies/me', undefined, true)
+  },
+  getUserTrophies(userId: string) {
+    return request<{ items: TrophyWithStatus[]; unlockedCount: number; totalCount: number }>('GET', `/api/v1/trophies/user/${userId}`)
+  },
+  getNewTrophies() {
+    return request<{ items: Trophy[] }>('GET', '/api/v1/trophies/new', undefined, true)
+  },
+  unlockTrophy(trophyId: string) {
+    return request<{ ok: boolean; trophy?: Trophy; xpGained: number; newXp: number; newLevel: number }>('POST', `/api/v1/trophies/unlock/${trophyId}`, {}, true)
+  },
+  // Game end
+  endGame(payload: { gameId: string; sessionId?: string; isWinner: boolean; cardsPlayed?: number; unoCalls?: number; playerCount?: number }) {
+    return request<GameEndResult>('POST', '/api/v1/trophies/game/end', payload, true)
+  },
+  // Stats
+  getMyStats() {
+    return request<UserDetailedStats>('GET', '/api/v1/trophies/stats/me', undefined, true)
+  },
+  getUserStats(userId: string) {
+    return request<UserDetailedStats>('GET', `/api/v1/trophies/stats/user/${userId}`)
+  },
+  // Delete session
+  deleteSession(id: string) {
+    return request<{ ok: boolean }>('DELETE', `/api/v1/sessions/${id}`, undefined, true)
   }
 }
 

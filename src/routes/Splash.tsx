@@ -6,18 +6,18 @@ import { api } from "../lib/api"
 const features = [
   {
     icon: <MessageCircleHeart className="h-5 w-5" />,
-    title: "Instant discussions",
-    description: "Private chats, public rooms and live reactions."
+    title: "Discussions instantanées",
+    description: "Chats privés, salons publics et réactions en direct."
   },
   {
     icon: <Users className="h-5 w-5" />,
-    title: "Community first",
-    description: "Find your squad or meet new teammates in seconds."
+    title: "Communauté avant tout",
+    description: "Trouve ton équipe ou rencontre de nouveaux coéquipiers en quelques secondes."
   },
   {
     icon: <Sparkles className="h-5 w-5" />,
-    title: "Motivating progression",
-    description: "Leaderboards, exclusive badges and a premium store."
+    title: "Progression motivante",
+    description: "Classements, badges exclusifs et boutique premium."
   }
 ]
 
@@ -27,7 +27,7 @@ export default function Splash() {
 
   const handleGuest = () => {
     api.logout()
-    enterAsGuest("Guest")
+    enterAsGuest("Invité")
     navigate("/home")
   }
 
@@ -35,7 +35,7 @@ export default function Splash() {
     <div className="flex min-h-screen flex-col items-center justify-between bg-gradient-to-b from-white to-bg px-6 py-10 text-center">
       <header className="flex w-full max-w-xl items-center justify-between text-sm text-muted">
         <span>AllForOne</span>
-        <span>Preview build</span>
+        <span>Version bêta</span>
       </header>
 
       <div className="flex w-full max-w-xl flex-col items-center gap-6">
@@ -43,10 +43,10 @@ export default function Splash() {
           <Gamepad2 className="h-8 w-8" />
         </div>
         <div>
-          <p className="text-[13px] font-semibold uppercase tracking-[0.4em] text-muted">Play. Chat. Connect.</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-txt">The social hub for your favorite games</h1>
+          <p className="text-[13px] font-semibold uppercase tracking-[0.4em] text-muted">Jouer. Discuter. Connecter.</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-txt">Le hub social pour tes jeux préférés</h1>
           <p className="mt-4 text-base text-muted">
-            Join your friends, start games in seconds and share highlights in an experience inspired by premium mobile design.
+            Rejoins tes amis, lance des parties en quelques secondes et partage tes moments forts dans une expérience inspirée du design mobile premium.
           </p>
         </div>
         <div className="flex w-full flex-col gap-3 sm:flex-row">
@@ -54,13 +54,13 @@ export default function Splash() {
             onClick={() => navigate('/auth')}
             className="w-full rounded-2xl bg-primary py-3 text-base font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring"
           >
-            Log in / Create account
+            Connexion / Inscription
           </button>
           <button
             onClick={handleGuest}
             className="w-full rounded-2xl border border-border/70 bg-surface py-3 text-base font-semibold text-txt transition hover:border-primary/50 focus-ring"
           >
-            Explore as guest
+            Explorer en invité
           </button>
         </div>
       </div>

@@ -1,5 +1,14 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
+export interface GameStats {
+  gamesPlayed: number
+  wins: number
+  losses: number
+  cardsPlayed: number
+  unoCalls: number
+  lastPlayedAt?: Date
+}
+
 export interface UserDocument extends Document {
   username: string
   email: string
@@ -18,6 +27,11 @@ export interface UserDocument extends Document {
     wins: number
     losses: number
   }
+  gameStats: Map<string, GameStats>
+  currentWinStreak: number
+  bestWinStreak: number
+  favoriteGame?: string
+  totalGamesPlayed: number
   providers: Array<{
     provider: 'google'
     providerId: string
@@ -33,6 +47,18 @@ const StatsSchema = new Schema(
   {
     wins: { type: Number, default: 0 },
     losses: { type: Number, default: 0 }
+  },
+  { _id: false }
+)
+
+const GameStatsSchema = new Schema(
+  {
+    gamesPlayed: { type: Number, default: 0 },
+    wins: { type: Number, default: 0 },
+    losses: { type: Number, default: 0 },
+    cardsPlayed: { type: Number, default: 0 },
+    unoCalls: { type: Number, default: 0 },
+    lastPlayedAt: { type: Date }
   },
   { _id: false }
 )
@@ -62,6 +88,11 @@ const UserSchema = new Schema<UserDocument>(
     xp: { type: Number, default: 0, index: true },
     level: { type: Number, default: 1 },
     stats: { type: StatsSchema, default: () => ({}) },
+    gameStats: { type: Map, of: GameStatsSchema, default: () => new Map() },
+    currentWinStreak: { type: Number, default: 0 },
+    bestWinStreak: { type: Number, default: 0 },
+    favoriteGame: { type: String },
+    totalGamesPlayed: { type: Number, default: 0 },
     providers: { type: [ProviderSchema], default: [] },
     resetToken: String,
     resetTokenExpires: Date

@@ -60,8 +60,22 @@ export default function Messages() {
     if (!conversationId) return
     const socket = getSocket()
     if (!socket) return
-    socket.emit('join_conversation', conversationId)
+    
+    const joinConversation = () => {
+      console.log('[Messages] Joining conversation:', conversationId)
+      socket.emit('join_conversation', conversationId)
+    }
+    
+    // Si déjà connecté, joindre immédiatement
+    if (socket.connected) {
+      joinConversation()
+    }
+    
+    // Écouter les reconnexions pour rejoindre à nouveau
+    socket.on('connect', joinConversation)
+    
     return () => {
+      socket.off('connect', joinConversation)
       socket.emit('leave_conversation', conversationId)
     }
   }, [conversationId])
@@ -97,8 +111,8 @@ export default function Messages() {
   const memberCount = conversation.members.length
 
   return (
-    <div className="flex min-h-[calc(100vh-96px)] flex-col gap-4 pb-24">
-      <Card className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex h-[calc(100vh-96px)] flex-col gap-4 pb-24">
+      <Card className="flex-shrink-0 flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-base font-semibold text-primary">
             {initials}
@@ -144,7 +158,7 @@ export default function Messages() {
 
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto rounded-3xl border border-border/60 bg-surface/70 px-4 py-6 shadow-soft backdrop-blur-sm"
+        className="flex-1 min-h-0 overflow-y-auto rounded-3xl border border-border/60 bg-surface/70 px-4 py-6 shadow-soft backdrop-blur-sm"
       >
         {messageState?.loading ? <p className="text-sm text-muted">Chargement...</p> : null}
         {messageState?.error ? <p className="text-sm text-danger">{messageState.error}</p> : null}
@@ -176,15 +190,17 @@ export default function Messages() {
         </div>
       </div>
 
-      <ChatComposer
-        onSend={async (text) => {
-          try {
-            await sendMessage(conversationId, text)
-          } catch (err: any) {
-            window.alert(err?.message ?? "Impossible d'envoyer le message")
-          }
-        }}
-      />
+      <div className="flex-shrink-0">
+        <ChatComposer
+          onSend={async (text) => {
+            try {
+              await sendMessage(conversationId, text)
+            } catch (err: any) {
+              window.alert(err?.message ?? "Impossible d'envoyer le message")
+            }
+          }}
+        />
+      </div>
     </div>
   )
 }

@@ -153,14 +153,14 @@ export default function Auth() {
     } catch (err: any) {
       if (isApiError(err)) {
         if (err.status === 401) {
-          setError("Invalid email or password.")
+          setError("Email ou mot de passe incorrect.")
         } else if (err.status === 0 || err.status >= 500) {
-          setError("Server unreachable. Check that the API (port 8080) is running.")
+          setError("Serveur inaccessible. Vérifie que l'API (port 3001) est lancée.")
         } else {
-          setError(err.message || "Authentication failed")
+          setError(err.message || "Échec de l'authentification")
         }
       } else {
-        setError(err?.message || "Authentication failed")
+        setError(err?.message || "Échec de l'authentification")
       }
     } finally {
       setLoading(false)
@@ -169,20 +169,20 @@ export default function Auth() {
 
   async function handleForgotPassword() {
     if (!email) {
-      setError("Enter your email first")
+      setError("Entre d'abord ton email")
       return
     }
     try {
       setError(null)
       await api.forgotPassword(email)
-      setInfo("Reset token generated (check backend console). Use the form below to set a new password.")
+      setInfo("Jeton de réinitialisation généré (voir console backend). Utilise le formulaire ci-dessous pour définir un nouveau mot de passe.")
       setShowReset(true)
     } catch (err: any) {
       if (isApiError(err) && (err.status === 0 || err.status >= 500)) {
-        setError("Server unreachable. Check that the API (port 8080) is running.")
+        setError("Serveur inaccessible. Vérifie que l'API (port 3001) est lancée.")
         return
       }
-      setError(err?.message || "Unable to send reset email")
+      setError(err?.message || "Impossible d'envoyer l'email de réinitialisation")
     }
   }
 
@@ -191,30 +191,30 @@ export default function Auth() {
     try {
       setError(null)
       await api.resetPassword({ token: resetToken, password: resetPasswordValue })
-      setInfo("Password updated. You can now log in.")
+      setInfo("Mot de passe mis à jour. Tu peux maintenant te connecter.")
       setShowReset(false)
       setMode("login")
     } catch (err: any) {
       if (isApiError(err) && (err.status === 0 || err.status >= 500)) {
-        setError("Server unreachable. Check that the API is running.")
+        setError("Serveur inaccessible. Vérifie que l'API est lancée.")
         return
       }
-      setError(err?.message || "Unable to reset password")
+      setError(err?.message || "Impossible de réinitialiser le mot de passe")
     }
   }
 
   const handleGoogleLogin = React.useCallback(() => {
     if (!googleClientId) {
-      setError("Google OAuth not configured")
+      setError("Google OAuth non configuré")
       return
     }
     if (!googleReady) {
-      setError("Google services not ready yet. Please retry in a second.")
+      setError("Services Google pas encore prêts. Réessaye dans une seconde.")
       return
     }
     const google = window.google
     if (!google?.accounts?.id) {
-      setError("Google services not ready")
+      setError("Services Google non disponibles")
       return
     }
     setError(null)
@@ -231,9 +231,9 @@ export default function Auth() {
     <div className="mx-auto flex min-h-screen w-full max-w-xl flex-col gap-10 bg-bg px-6 py-10">
       <header>
         <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-muted">AllForOne</p>
-        <h1 className="mt-2 text-3xl font-semibold text-txt">Welcome back</h1>
+        <h1 className="mt-2 text-3xl font-semibold text-txt">Bon retour !</h1>
         <p className="mt-3 text-sm text-muted">
-          Create an account or log in to sync your progression and play with the community.
+          Crée un compte ou connecte-toi pour synchroniser ta progression et jouer avec la communauté.
         </p>
       </header>
 
@@ -248,13 +248,13 @@ export default function Auth() {
           className="flex w-full items-center justify-center gap-3 rounded-2xl border border-border/80 bg-surface py-3 text-sm font-semibold text-txt transition hover:border-primary/60 hover:text-primary focus-ring disabled:cursor-not-allowed disabled:opacity-60"
         >
           <LogIn className="h-5 w-5" />
-          Continue with Google
+          Continuer avec Google
         </button>
       </section>
 
       <div className="relative flex items-center gap-3 text-xs text-muted">
         <span className="flex-1 border-t border-border/60" aria-hidden />
-        <span aria-label="or">or</span>
+        <span aria-label="ou">ou</span>
         <span className="flex-1 border-t border-border/60" aria-hidden />
       </div>
 
@@ -268,19 +268,19 @@ export default function Auth() {
           }}
           className="text-sm font-semibold text-primary hover:underline focus-ring"
         >
-          {mode === "login" ? 'Create an account' : 'Already registered? Login'}
+          {mode === "login" ? 'Créer un compte' : 'Déjà inscrit ? Connexion'}
         </button>
         <button type="button" onClick={handleForgotPassword} className="text-sm font-semibold text-muted hover:text-primary focus-ring">
-          Forgot password?
+          Mot de passe oublié ?
         </button>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4 rounded-3xl border border-border/70 bg-surface p-5 shadow-soft">
         {mode === "register" && (
-          <TextField id="display-name" label="Display name" type="text" value={displayName} onChange={setDisplayName} />
+          <TextField id="display-name" label="Nom d'affichage" type="text" value={displayName} onChange={setDisplayName} />
         )}
         <TextField id="email" label="Email" type="email" value={email} onChange={setEmail} />
-        <TextField id="password" label="Password" type="password" value={password} onChange={setPassword} />
+        <TextField id="password" label="Mot de passe" type="password" value={password} onChange={setPassword} />
 
         <button
           type="submit"
@@ -288,23 +288,23 @@ export default function Auth() {
           className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3 text-base font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring disabled:cursor-not-allowed disabled:bg-primary/50"
         >
           {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <LogIn className="h-4 w-4" />}
-          {mode === "register" ? 'Create account' : 'Log in'}
+          {mode === "register" ? 'Créer le compte' : 'Se connecter'}
         </button>
       </form>
 
       {showReset ? (
         <form onSubmit={handleResetPassword} className="space-y-3 rounded-3xl border border-border/60 bg-bg px-4 py-3">
-          <p className="text-sm text-muted">Paste the reset token printed in the backend logs, then choose a new password.</p>
-          <TextField id="reset-token" label="Reset token" type="text" value={resetToken} onChange={setResetToken} />
+          <p className="text-sm text-muted">Colle le jeton de réinitialisation affiché dans les logs du backend, puis choisis un nouveau mot de passe.</p>
+          <TextField id="reset-token" label="Jeton de réinitialisation" type="text" value={resetToken} onChange={setResetToken} />
           <TextField
             id="reset-password"
-            label="New password"
+            label="Nouveau mot de passe"
             type="password"
             value={resetPasswordValue}
             onChange={setResetPasswordValue}
           />
           <button type="submit" className="w-full rounded-2xl bg-primary py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring">
-            Update password
+            Mettre à jour le mot de passe
           </button>
         </form>
       ) : null}
@@ -314,7 +314,7 @@ export default function Auth() {
         onClick={handleEnterGuest}
         className="self-center text-sm font-medium text-muted transition hover:text-primary focus-ring"
       >
-        Continue as guest
+        Continuer en invité
       </button>
     </div>
   )

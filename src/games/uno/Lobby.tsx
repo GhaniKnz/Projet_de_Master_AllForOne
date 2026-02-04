@@ -1,15 +1,19 @@
 import React from 'react'
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
+import {
+  Users, Crown, Bot, Copy, Share2, Settings, Play, Clock, Zap,
+  Shield, Layers, UserPlus, Check, X, Link, Sparkles, Trophy, Target
+} from 'lucide-react'
 import { useGamesStore, GameSession } from '../../store/games'
 import { useAppStore } from '../../store/app'
 import { useUnoStore } from '../../store/uno'
-import Card from '../../components/Card'
-import Topbar from '../../components/Topbar'
 import { api, isBackendConfigured, getCurrentUser } from '../../lib/api'
 
 const POLL_INTERVAL = 5000
 
-export default function UnoLobby() {
+type LobbyPlayer = GameSession['players'][0]
+
+export default function UnoLobbyNew() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const location = useLocation()
@@ -52,6 +56,8 @@ export default function UnoLobby() {
   const [loading, setLoading] = React.useState(remote && !initialSession)
   const [error, setError] = React.useState<string | null>(null)
   const [feedback, setFeedback] = React.useState<string | null>(null)
+  const [showSettings, setShowSettings] = React.useState(false)
+  const [copied, setCopied] = React.useState(false)
 
   React.useEffect(() => {
     if (!remote) return
@@ -70,6 +76,18 @@ export default function UnoLobby() {
         if (current) setLocalPlayerId(current.userId)
         const data = await api.getSession(targetId)
         if (!mounted) return
+        
+        // If the game is already in progress and we're a player, go directly to the game
+        if (data.status === 'in-game' && current) {
+          const isPlayerInGame = data.players.some((p: any) => p.id === current.userId)
+          if (isPlayerInGame) {
+            setActiveSession(targetId)
+            initializeUno(data, data.players)
+            navigate(`/uno/game?session=${targetId}`, { replace: true })
+            return
+          }
+        }
+        
         setRemoteSession(data)
         setActiveSession(targetId)
         setLoading(false)
@@ -87,7 +105,7 @@ export default function UnoLobby() {
       mounted = false
       clearInterval(interval)
     }
-  }, [remote, sessionIdFromUrl, initialSession, activeSessionId, setActiveSession, setLocalPlayerId])
+  }, [remote, sessionIdFromUrl, initialSession, activeSessionId, setActiveSession, setLocalPlayerId, navigate, initializeUno])
 
   const session = remote ? remoteSession : currentSession
 
@@ -105,10 +123,10 @@ export default function UnoLobby() {
 
   if (remote && loading) {
     return (
-      <div className="min-h-screen bg-bg">
-        <Topbar title="Salon UNO" back />
-        <div className="mx-auto max-w-xl px-4 py-6">
-          <Card className="text-sm text-muted">Loading lobby...</Card>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-white/80">Chargement du salon...</p>
         </div>
       </div>
     )
@@ -116,10 +134,19 @@ export default function UnoLobby() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-bg">
-        <Topbar title="Salon UNO" back />
-        <div className="mx-auto max-w-xl px-4 py-6">
-          <Card className="text-sm text-muted">No active session. Return to the games catalog.</Card>
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 flex items-center justify-center p-4">
+        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 text-center max-w-md">
+          <div className="w-20 h-20 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <X className="w-10 h-10 text-red-500" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Session introuvable</h2>
+          <p className="text-white/60 mb-6">La session n'existe pas ou a expiré.</p>
+          <button
+            onClick={() => navigate('/games')}
+            className="bg-primary text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Retour aux jeux
+          </button>
         </div>
       </div>
     )
@@ -131,15 +158,11 @@ export default function UnoLobby() {
   const readyPlayers = session.players.filter((player) => player.isBot || player.status === 'ready').length
   const everyoneReady = totalPlayers > 0 && readyPlayers === totalPlayers
   const canStart = isHost && totalPlayers >= 2 && everyoneReady
-  const inviteLink =
-    typeof window !== 'undefined' ? `${window.location.origin.replace(/\/$/, '')}/uno/lobby?session=${session.id}` : ''
-  const canAddBot =
-    (session.options.allowBots ?? true) &&
-    isHost &&
-    session.status === 'waiting' &&
-    session.players.length < session.maxPlayers
-  const canNativeShare =
-    typeof navigator !== 'undefined' && 'share' in navigator && typeof (navigator as any).share === 'function'
+  const inviteLink = typeof window !== 'undefined'
+    ? `${window.location.origin.replace(/\/$/, '')}/uno/lobby?session=${session.id}`
+    : ''
+  const canAddBot = (session.options.allowBots ?? true) && isHost && session.status === 'waiting' && session.players.length < session.maxPlayers
+  const canNativeShare = typeof navigator !== 'undefined' && 'share' in navigator
 
   const handleToggleReady = async () => {
     if (!localPlayer) return
@@ -151,8 +174,8 @@ export default function UnoLobby() {
         }
         const updated = await api.toggleReady(session.id)
         setRemoteSession(updated)
-         setError(null)
-         setFeedback('Statut de préparation mis à jour')
+        setError(null)
+        setFeedback('Statut de préparation mis à jour')
       } catch (err: any) {
         setError(err?.message || 'Failed to change ready status')
       }
@@ -163,7 +186,7 @@ export default function UnoLobby() {
 
   const handleAddBot = () => {
     if (remote) {
-      ;(async () => {
+      (async () => {
         try {
           if (!api.isAuthenticated()) {
             navigate('/auth')
@@ -208,7 +231,7 @@ export default function UnoLobby() {
   const handleOptionChange = (updates: Partial<typeof session.options>) => {
     if (remote) {
       if (!isHost) return
-      ;(async () => {
+      (async () => {
         try {
           if (!api.isAuthenticated()) {
             navigate('/auth')
@@ -227,213 +250,388 @@ export default function UnoLobby() {
     updateOptions(session.id, updates)
   }
 
-  const copyToClipboard = (value: string, message: string) => {
+  const copyToClipboard = (value: string) => {
     if (!value) return
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard
-        .writeText(value)
-        .then(() => setFeedback(message))
-        .catch(() => setError('Impossible de copier dans le presse-papiers'))
-      return
-    }
-    try {
-      const textarea = document.createElement('textarea')
-      textarea.value = value
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.focus()
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-      setFeedback(message)
-    } catch (err) {
-      setError('Impossible de copier dans le presse-papiers')
-    }
+    navigator.clipboard?.writeText(value).then(() => {
+      setCopied(true)
+      setFeedback('Copié !')
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => setError('Impossible de copier'))
   }
 
+  const isNoMercy = session.gameId === 'uno-no-mercy'
+
   return (
-    <div className="min-h-screen bg-bg">
-      <Topbar title="Salon UNO" subtitle={renderVariantLabel(session.gameId)} back />
-      <div className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-28 pt-4">
-        {error ? <Card className="border-danger/40 bg-danger/10 text-sm text-danger">{error}</Card> : null}
-        {feedback ? <Card className="border-primary/40 bg-primary/10 text-sm text-primary">{feedback}</Card> : null}
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 overflow-hidden">
+      {/* Animated background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 -left-20 w-80 h-80 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-accent/20 rounded-full blur-3xl animate-pulse animation-delay-1000" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
+      </div>
 
-        <Card className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-muted">Code de session</p>
-            <p className="text-lg font-semibold text-txt">{session.accessCode ?? 'Public'}</p>
-          </div>
+      {/* Header */}
+      <header className="relative z-10 px-4 py-4">
+        <div className="max-w-2xl mx-auto flex items-center justify-between">
           <button
-            onClick={() => session.accessCode && copyToClipboard(session.accessCode, 'Code de session copié')}
-            className="rounded-2xl border border-border/60 px-4 py-2 text-xs font-semibold text-muted transition hover:border-primary/50 hover:text-primary focus-ring disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!session.accessCode}
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white"
           >
-            Copier
+            ←
           </button>
-        </Card>
-
-        <Card className="flex flex-col gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-muted">Lien d invitation</p>
-            <p className="break-words text-sm text-txt">{inviteLink}</p>
+          <div className="text-center">
+            <h1 className="text-2xl font-black text-white flex items-center gap-2 justify-center">
+              <span className="text-3xl">🃏</span>
+              UNO
+              {isNoMercy && (
+                <span className="text-sm bg-gradient-to-r from-red-500 to-orange-500 px-3 py-1 rounded-full font-bold">
+                  NO MERCY
+                </span>
+              )}
+            </h1>
+            <p className="text-white/60 text-sm">Salon d'attente</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => copyToClipboard(inviteLink, 'Lien d’invitation copié')}
-              className="rounded-2xl border border-border/60 px-4 py-2 text-xs font-semibold text-muted transition hover:border-primary/50 hover:text-primary focus-ring"
-            >
-              Copier le lien
-            </button>
-            {canNativeShare ? (
-              <button
-                type="button"
-                onClick={() => {
-                  ;(navigator as any)
-                    .share({
-                      title: session.title,
-                      text: 'Rejoins ma partie UNO sur AllForOne !',
-                      url: inviteLink
-                    })
-                    .catch(() => null)
-                }}
-                className="rounded-2xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring"
-              >
-                Partager
-              </button>
-            ) : null}
-          </div>
-        </Card>
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted">
-              Players ({session.players.length}/{session.maxPlayers})
-            </h2>
-            {canAddBot ? (
-              <button
-                onClick={handleAddBot}
-                className="rounded-2xl border border-border/60 px-4 py-2 text-xs font-semibold text-muted transition hover:border-primary/50 hover:text-primary focus-ring"
-              >
-                Ajouter un bot
-              </button>
-            ) : null}
-          </div>
-          <div className="space-y-2">
-            {session.players.map((player) => (
-              <Card key={player.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                    {player.avatar}
-                  </span>
-                  <div>
-                    <p className="text-sm font-semibold text-txt">
-                      {player.name}
-                      {player.isHost ? ' (Hôte)' : ''}
-                      {player.id === localPlayerId ? ' (Vous)' : ''}
-                    </p>
-                    <div className="flex flex-wrap gap-2 text-xs text-muted">
-                      <span>{renderStatus(player.status)}</span>
-                      {player.isBot ? <span>Bot</span> : null}
-                    </div>
-                  </div>
-                </div>
-                {player.id === localPlayerId ? (
-                  <button
-                    onClick={handleToggleReady}
-                    className={`rounded-2xl px-4 py-2 text-xs font-semibold focus-ring ${
-                      player.status === 'ready'
-                        ? 'bg-primary text-white shadow-card'
-                        : 'border border-border/60 text-muted transition hover:border-primary/50 hover:text-primary'
-                    }`}
-                  >
-                    {player.status === 'ready' ? 'Annuler Prêt' : 'Je suis prêt'}
-                  </button>
-                ) : (
-                  <span className="text-xs text-muted">{player.status === 'ready' ? 'Prêt' : 'En attente'}</span>
-                )}
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-muted">Règles</h2>
-          <Card className="grid gap-3 sm:grid-cols-2">
-            <ToggleField
-              label="Empilement des +2/+4"
-              value={session.options.allowStacking ?? false}
-              onChange={(value) => handleOptionChange({ allowStacking: value })}
-              disabled={!isHost}
-            />
-            <ToggleField
-              label="Challenge +4"
-              value={session.options.allowWildChallenge ?? false}
-              onChange={(value) => handleOptionChange({ allowWildChallenge: value })}
-              disabled={!isHost}
-            />
-            <InputField
-              label="Timer par tour"
-              value={session.options.timerPerTurn ?? 0}
-              onChange={(value) => handleOptionChange({ timerPerTurn: value })}
-              disabled={!isHost}
-            />
-            {session.gameId === 'uno-no-mercy' ? (
-              <InputField
-                label="Seuil élimination"
-                value={session.options.eliminationThreshold ?? 25}
-                onChange={(value) => handleOptionChange({ eliminationThreshold: value })}
-                disabled={!isHost}
-              />
-            ) : null}
-          </Card>
-        </section>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
           <button
-            onClick={handleToggleReady}
-            className="rounded-2xl border border-border/60 px-4 py-2 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-primary focus-ring"
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-2 rounded-xl transition-colors text-white ${showSettings ? 'bg-primary' : 'bg-white/10 hover:bg-white/20'}`}
           >
-            {localPlayer?.status === 'ready' ? 'Annuler Prêt' : 'Je suis prêt'}
-          </button>
-          <button
-            onClick={handleStart}
-            className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring disabled:cursor-not-allowed disabled:bg-muted"
-            disabled={!canStart}
-          >
-            Lancer la partie
+            <Settings className="w-5 h-5" />
           </button>
         </div>
+      </header>
+
+      {/* Main content */}
+      <main className="relative z-10 px-4 pb-32 max-w-2xl mx-auto">
+        {/* Error/Feedback */}
+        {error && (
+          <div className="mb-4 bg-red-500/20 border border-red-500/50 text-red-200 px-4 py-3 rounded-2xl flex items-center gap-2 animate-shake">
+            <X className="w-5 h-5" />
+            {error}
+          </div>
+        )}
+        {feedback && (
+          <div className="mb-4 bg-green-500/20 border border-green-500/50 text-green-200 px-4 py-3 rounded-2xl flex items-center gap-2 animate-slide-down">
+            <Check className="w-5 h-5" />
+            {feedback}
+          </div>
+        )}
+
+        {/* Session code card */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 mb-6 border border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-white/60 text-xs uppercase tracking-wider mb-1">Code de session</p>
+              <p className="text-4xl font-black text-white tracking-widest">
+                {session.accessCode ?? 'PUBLIC'}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => session.accessCode && copyToClipboard(session.accessCode)}
+                className={`p-3 rounded-xl transition-all ${copied ? 'bg-green-500 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+              >
+                {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+              </button>
+              {canNativeShare && (
+                <button
+                  onClick={() => (navigator as any).share({
+                    title: session.title,
+                    text: 'Rejoins ma partie UNO !',
+                    url: inviteLink
+                  }).catch(() => null)}
+                  className="p-3 rounded-xl bg-primary hover:bg-primary/90 text-white transition-colors"
+                >
+                  <Share2 className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-white/60 text-sm bg-white/5 rounded-xl px-4 py-2">
+            <Link className="w-4 h-4" />
+            <span className="truncate flex-1">{inviteLink}</span>
+            <button
+              onClick={() => copyToClipboard(inviteLink)}
+              className="text-primary hover:text-primary/80 text-xs font-semibold"
+            >
+              Copier
+            </button>
+          </div>
+        </div>
+
+        {/* Players */}
+        <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 mb-6 border border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-white font-bold flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Joueurs ({totalPlayers}/{session.maxPlayers})
+            </h2>
+            {canAddBot && (
+              <button
+                onClick={handleAddBot}
+                className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-white text-sm transition-colors"
+              >
+                <Bot className="w-4 h-4" />
+                Ajouter un bot
+              </button>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          <div className="h-2 bg-white/10 rounded-full mb-6 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-primary to-accent rounded-full transition-all duration-500"
+              style={{ width: `${(readyPlayers / totalPlayers) * 100}%` }}
+            />
+          </div>
+
+          {/* Player list */}
+          <div className="space-y-3">
+            {session.players.map((player, index) => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                isLocal={player.id === localPlayerId}
+                onToggleReady={player.id === localPlayerId ? handleToggleReady : undefined}
+                animationDelay={index * 100}
+              />
+            ))}
+
+            {/* Empty slots */}
+            {Array.from({ length: session.maxPlayers - totalPlayers }).map((_, i) => (
+              <div
+                key={`empty-${i}`}
+                className="flex items-center justify-center py-4 border-2 border-dashed border-white/20 rounded-2xl text-white/40"
+              >
+                <UserPlus className="w-5 h-5 mr-2" />
+                En attente d'un joueur...
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Settings panel */}
+        {showSettings && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 mb-6 border border-white/10 animate-slide-down">
+            <h2 className="text-white font-bold flex items-center gap-2 mb-6">
+              <Settings className="w-5 h-5" />
+              Règles de la partie
+            </h2>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <OptionToggle
+                icon={<Layers className="w-5 h-5" />}
+                label="Empilement des +2/+4"
+                description="Permet d'empiler les cartes +2 et +4"
+                value={session.options.allowStacking ?? false}
+                onChange={(v) => handleOptionChange({ allowStacking: v })}
+                disabled={!isHost}
+              />
+              <OptionToggle
+                icon={<Shield className="w-5 h-5" />}
+                label="Challenge +4"
+                description="Permet de contester un +4"
+                value={session.options.allowWildChallenge ?? false}
+                onChange={(v) => handleOptionChange({ allowWildChallenge: v })}
+                disabled={!isHost}
+              />
+              <OptionInput
+                icon={<Clock className="w-5 h-5" />}
+                label="Timer par tour"
+                description="Secondes par tour (0 = illimité)"
+                value={session.options.timerPerTurn ?? 0}
+                onChange={(v) => handleOptionChange({ timerPerTurn: v })}
+                disabled={!isHost}
+                unit="sec"
+              />
+              {isNoMercy && (
+                <OptionInput
+                  icon={<Target className="w-5 h-5" />}
+                  label="Seuil d'élimination"
+                  description="Nombre de cartes pour être éliminé"
+                  value={session.options.eliminationThreshold ?? 25}
+                  onChange={(v) => handleOptionChange({ eliminationThreshold: v })}
+                  disabled={!isHost}
+                  unit="cartes"
+                />
+              )}
+            </div>
+
+            {!isHost && (
+              <p className="text-white/40 text-sm text-center mt-4">
+                Seul l'hôte peut modifier les règles
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Game mode info */}
+        {isNoMercy && (
+          <div className="bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/30 rounded-3xl p-6 mb-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Zap className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-white font-bold mb-1">Mode No Mercy</h3>
+                <p className="text-white/60 text-sm">
+                  Cartes spéciales brutales (+6, +10, Skip All), élimination si vous atteignez {session.options.eliminationThreshold ?? 25} cartes.
+                  Pas de pitié !
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Bottom action bar */}
+      <div className="fixed bottom-0 inset-x-0 z-20 bg-gradient-to-t from-black via-black/90 to-transparent pt-8 pb-6 px-4">
+        <div className="max-w-2xl mx-auto flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleToggleReady}
+            className={`
+              flex-1 py-4 rounded-2xl font-bold text-lg transition-all
+              ${localPlayer?.status === 'ready'
+                ? 'bg-white/20 text-white border-2 border-white/30'
+                : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30'
+              }
+            `}
+          >
+            {localPlayer?.status === 'ready' ? (
+              <span className="flex items-center justify-center gap-2">
+                <Check className="w-5 h-5" />
+                Prêt !
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-2">
+                <Sparkles className="w-5 h-5" />
+                Je suis prêt
+              </span>
+            )}
+          </button>
+
+          {isHost && (
+            <button
+              onClick={handleStart}
+              disabled={!canStart}
+              className={`
+                flex-1 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2
+                ${canStart
+                  ? 'bg-gradient-to-r from-primary to-accent text-white shadow-lg shadow-primary/30 hover:scale-[1.02]'
+                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                }
+              `}
+            >
+              <Play className="w-5 h-5" />
+              Lancer la partie
+            </button>
+          )}
+        </div>
+
+        {!canStart && isHost && (
+          <p className="text-white/40 text-sm text-center mt-3">
+            {totalPlayers < 2 ? 'Minimum 2 joueurs requis' : 'En attente que tous les joueurs soient prêts'}
+          </p>
+        )}
       </div>
     </div>
   )
 }
 
-function renderVariantLabel(gameId: string) {
-  return gameId === 'uno-no-mercy' ? 'Mode No Mercy' : 'Mode classique'
+// Sub-components
+function PlayerCard({
+  player,
+  isLocal,
+  onToggleReady,
+  animationDelay
+}: {
+  player: LobbyPlayer
+  isLocal: boolean
+  onToggleReady?: () => void
+  animationDelay: number
+}) {
+  const isReady = player.status === 'ready' || player.isBot
+
+  return (
+    <div
+      className={`
+        flex items-center justify-between p-4 rounded-2xl transition-all
+        ${isLocal ? 'bg-primary/20 border-2 border-primary/50' : 'bg-white/5'}
+        animate-slide-in
+      `}
+      style={{ animationDelay: `${animationDelay}ms` }}
+    >
+      <div className="flex items-center gap-3">
+        {/* Avatar */}
+        <div className={`
+          relative w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg
+          ${isReady ? 'bg-green-500 text-white' : 'bg-white/20 text-white'}
+          transition-colors
+        `}>
+          {player.avatar}
+          {player.isHost && (
+            <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center">
+              <Crown className="w-3 h-3 text-white" />
+            </div>
+          )}
+          {player.isBot && (
+            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-gray-600 rounded-full flex items-center justify-center">
+              <Bot className="w-3 h-3 text-white" />
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div>
+          <p className="text-white font-semibold flex items-center gap-2">
+            {player.name}
+            {isLocal && <span className="text-xs text-primary">(Vous)</span>}
+          </p>
+          <p className={`text-sm ${isReady ? 'text-green-400' : 'text-white/40'}`}>
+            {player.isBot ? 'Bot' : isReady ? 'Prêt' : 'En attente'}
+          </p>
+        </div>
+      </div>
+
+      {/* Action */}
+      {isLocal && onToggleReady && !player.isBot && (
+        <button
+          onClick={onToggleReady}
+          className={`
+            px-4 py-2 rounded-xl font-semibold text-sm transition-all
+            ${isReady
+              ? 'bg-white/10 text-white hover:bg-white/20'
+              : 'bg-green-500 text-white hover:bg-green-600'
+            }
+          `}
+        >
+          {isReady ? 'Annuler' : 'Prêt'}
+        </button>
+      )}
+
+      {/* Ready indicator for others */}
+      {!isLocal && (
+        <div className={`
+          w-10 h-10 rounded-full flex items-center justify-center
+          ${isReady ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-white/20'}
+        `}>
+          {isReady ? <Check className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+        </div>
+      )}
+    </div>
+  )
 }
 
-function renderStatus(status: string) {
-  switch (status) {
-    case 'ready':
-      return 'Prêt'
-    case 'playing':
-      return 'En jeu'
-    case 'waiting':
-      return 'En attente'
-    default:
-      return status
-  }
-}
-
-function ToggleField({
+function OptionToggle({
+  icon,
   label,
+  description,
   value,
   onChange,
   disabled
 }: {
+  icon: React.ReactNode
   label: string
+  description: string
   value: boolean
   onChange: (value: boolean) => void
   disabled?: boolean
@@ -441,54 +639,76 @@ function ToggleField({
   return (
     <button
       onClick={() => !disabled && onChange(!value)}
-      className={`flex items-center justify-between rounded-2xl border px-4 py-3 text-xs font-semibold transition focus-ring ${
-        disabled
-          ? 'cursor-not-allowed border-border/60 text-muted/60'
-          : value
-          ? 'border-primary/40 bg-primary/10 text-primary'
-          : 'border-border/60 text-muted hover:border-primary/50 hover:text-primary'
-      }`}
       disabled={disabled}
+      className={`
+        text-left p-4 rounded-2xl transition-all
+        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+        ${value ? 'bg-primary/20 border-2 border-primary/50' : 'bg-white/5 border-2 border-transparent hover:border-white/20'}
+      `}
     >
-      {label}
-      <span
-        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
-          value ? 'bg-primary' : 'bg-border'
-        }`}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-            value ? 'translate-x-4' : 'translate-x-1'
-          }`}
-        />
-      </span>
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-xl ${value ? 'bg-primary/30 text-primary' : 'bg-white/10 text-white/60'}`}>
+            {icon}
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm">{label}</p>
+            <p className="text-white/40 text-xs">{description}</p>
+          </div>
+        </div>
+        <div className={`
+          w-12 h-6 rounded-full transition-colors relative
+          ${value ? 'bg-primary' : 'bg-white/20'}
+        `}>
+          <div className={`
+            absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-md
+            ${value ? 'left-7' : 'left-1'}
+          `} />
+        </div>
+      </div>
     </button>
   )
 }
 
-function InputField({
+function OptionInput({
+  icon,
   label,
+  description,
   value,
   onChange,
-  disabled
+  disabled,
+  unit
 }: {
+  icon: React.ReactNode
   label: string
+  description: string
   value: number
   onChange: (value: number) => void
   disabled?: boolean
+  unit: string
 }) {
   return (
-    <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-muted">
-      {label}
-      <input
-        type="number"
-        min={0}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value) || 0)}
-        disabled={disabled}
-        className="w-full rounded-2xl border border-border/60 bg-bg px-3 py-2 text-sm text-txt focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
-      />
-    </label>
+    <div className={`p-4 rounded-2xl bg-white/5 ${disabled ? 'opacity-50' : ''}`}>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="p-2 rounded-xl bg-white/10 text-white/60">
+          {icon}
+        </div>
+        <div>
+          <p className="text-white font-semibold text-sm">{label}</p>
+          <p className="text-white/40 text-xs">{description}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value) || 0)}
+          disabled={disabled}
+          className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white text-center font-semibold focus:outline-none focus:border-primary disabled:cursor-not-allowed"
+        />
+        <span className="text-white/40 text-sm">{unit}</span>
+      </div>
+    </div>
   )
 }
-

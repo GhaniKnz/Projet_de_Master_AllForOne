@@ -20,6 +20,7 @@ export type GameDefinition = {
   modes: SessionMode[]
   supportsTeams?: boolean
   defaultOptions: Partial<SessionOptions>
+  imageUrl?: string
 }
 
 export type SessionOptions = {
@@ -112,6 +113,7 @@ const catalog: GameDefinition[] = [
     durationHint: '5-8 min',
     highlight: 'Matchs rapides en temps reel',
     modes: ['realtime'],
+    imageUrl: '/uno_card.png',
     defaultOptions: {
       allowStacking: true,
       allowWildChallenge: true,
@@ -132,6 +134,7 @@ const catalog: GameDefinition[] = [
     playerRange: [2, 6],
     durationHint: '8-12 min',
     modes: ['realtime'],
+    imageUrl: '/uno_no_mercy_card.png',
     defaultOptions: {
       allowStacking: true,
       allowWildChallenge: true,
@@ -154,6 +157,7 @@ const catalog: GameDefinition[] = [
     durationHint: '10-15 min',
     modes: ['realtime', 'turn-based'],
     supportsTeams: false,
+    imageUrl: 'https://images.unsplash.com/photo-1611996575749-79a3a250f948?w=400&h=300&fit=crop',
     defaultOptions: {
       allowStacking: false,
       allowWildChallenge: false,
@@ -166,115 +170,8 @@ const catalog: GameDefinition[] = [
 ]
 
 const initialSessions = (): GameSession[] => {
-  const host = (name: string): SessionPlayer => ({
-    id: name.toLowerCase().replace(/\s+/g, '-') + '-host',
-    name,
-    avatar: name.slice(0, 2).toUpperCase(),
-    isHost: true,
-    status: 'ready',
-    rating: 1240
-  })
-
-  return [
-    {
-      id: nanoid(),
-      gameId: 'uno',
-      title: 'Soiree UNO FR',
-      type: 'public',
-      status: 'waiting',
-      mode: 'realtime',
-      maxPlayers: 6,
-      createdAt: Date.now() - 1000 * 60 * 12,
-      hostId: 'lea-host',
-      players: [
-        host('Lea'),
-        {
-          id: 'alex-player',
-          name: 'Alex',
-          avatar: 'AX',
-          isHost: false,
-          status: 'ready',
-          rating: 1180
-        },
-        {
-          id: 'bot-uno-1',
-          name: 'Bot Uno',
-          avatar: 'B1',
-          isHost: false,
-          isBot: true,
-          status: 'waiting'
-        }
-      ],
-      options: {
-        allowStacking: true,
-        allowWildChallenge: true,
-        timerPerTurn: 20,
-        allowBots: true,
-        visibility: 'public',
-        mode: 'realtime'
-      }
-    },
-    {
-      id: nanoid(),
-      gameId: 'uno-no-mercy',
-      title: 'No Mercy ranked #124',
-      type: 'ranked',
-      status: 'waiting',
-      mode: 'realtime',
-      maxPlayers: 4,
-      createdAt: Date.now() - 1000 * 60 * 4,
-      hostId: 'lina-host',
-      players: [
-        host('Lina'),
-        {
-          id: 'marc-player',
-          name: 'Marc',
-          avatar: 'MC',
-          isHost: false,
-          status: 'ready',
-          rating: 1320
-        }
-      ],
-      options: {
-        allowStacking: true,
-        allowWildChallenge: true,
-        timerPerTurn: 15,
-        eliminationThreshold: 25,
-        allowBots: false,
-        visibility: 'ranked',
-        mode: 'realtime'
-      }
-    },
-    {
-      id: nanoid(),
-      gameId: 'derocher',
-      title: 'Tour par tour chill',
-      type: 'public',
-      status: 'waiting',
-      mode: 'turn-based',
-      maxPlayers: 4,
-      createdAt: Date.now() - 1000 * 60 * 25,
-      hostId: 'noah-host',
-      players: [
-        host('Noah'),
-        {
-          id: 'mila-player',
-          name: 'Mila',
-          avatar: 'ML',
-          isHost: false,
-          status: 'waiting'
-        }
-      ],
-      options: {
-        allowStacking: false,
-        allowWildChallenge: false,
-        timerPerTurn: 600, // 10 minutes
-        allowBots: false,
-        visibility: 'public',
-        mode: 'turn-based'
-      }
-    }
-  ]
+  // Return empty array - sessions should only come from backend or be created by users
+  return []
 }
 
 const mergeOptions = (base: SessionOptions, override?: Partial<SessionOptions>): SessionOptions => ({

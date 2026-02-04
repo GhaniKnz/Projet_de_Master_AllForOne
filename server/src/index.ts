@@ -18,6 +18,7 @@ import { usersRouter } from './routes/users.js'
 import { chatRouter } from './routes/chat.js'
 import { feedRouter } from './routes/feed.js'
 import { notificationsRouter } from './routes/notifications.js'
+import trophiesRouter from './routes/trophies.js'
 import { swaggerUi, swaggerSpec } from './swagger.js'
 import { connectMongo, disconnectMongo } from './config/mongo.js'
 import { connectRedis, disconnectRedis } from './config/redis.js'
@@ -70,7 +71,8 @@ const corsOptions: CorsOptions = {
 app.disable('x-powered-by')
 app.use(helmet({ crossOriginResourcePolicy: false }))
 app.use(cors(corsOptions))
-app.use(express.json({ limit: '1mb' }))
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ limit: '10mb', extended: true }))
 app.use(morgan('dev'))
 
 app.get('/', (_req: Request, res: Response) => {
@@ -93,6 +95,7 @@ app.use('/api/v1/sessions', sessionsRouter)
 app.use('/api/v1/conversations', chatRouter)
 app.use('/api/v1/feed', feedRouter)
 app.use('/api/v1/notifications', notificationsRouter)
+app.use('/api/v1/trophies', trophiesRouter)
 
 const io = new IOServer(server, {
   cors: {
@@ -103,24 +106,78 @@ const io = new IOServer(server, {
 registerSocketHandlers(io)
 bindSocketServer(io)
 
+// Cleanup inactive sessions every minute
+let cleanupInterval: NodeJS.Timeout | null = null
+
+async function cleanupInactiveSessions() {
+  try {
+    const response = await fetch(`http://localhost:${PORT}/api/v1/sessions/cleanup/inactive`, {
+      method: 'DELETE'
+    })
+    if (response.ok) {
+      const data = await response.json()
+      if (data.deleted > 0) {
+        console.log(`[Cleanup] Deleted ${data.deleted} inactive session(s)`)
+      }
+    }
+  } catch (err) {
+    // Silently ignore cleanup errors
+  }
+}
+
 async function bootstrap() {
-  await Promise.all([connectMongo(), connectRedis()])
-  await seedInitialData().catch((err) => {
-    console.error('Seeding failed', err)
-  })
+  let mongoConnected = false
+  let redisConnected = false
+
+  // Try to connect to MongoDB (optional in demo mode)
+  try {
+    await connectMongo()
+    mongoConnected = true
+    console.log('✅ MongoDB connected')
+  } catch (err) {
+    console.warn('⚠️  MongoDB not available - running in DEMO MODE (no persistence)')
+  }
+
+  // Try to connect to Redis (optional)
+  try {
+    await connectRedis()
+    redisConnected = true
+    console.log('✅ Redis connected')
+  } catch (err) {
+    console.warn('⚠️  Redis not available - running without Redis cache')
+  }
+
+  // Only seed if MongoDB is connected
+  if (mongoConnected) {
+    await seedInitialData().catch((err) => {
+      console.error('Seeding failed', err)
+    })
+  }
+
   server.listen(PORT, () => {
     // eslint-disable-next-line no-console
-    console.log(`AllForOne API ready on http://localhost:${PORT} (docs: /docs)`)
+    console.log(`\n🚀 AllForOne API ready on http://localhost:${PORT} (docs: /docs)`)
+    console.log(`   Mode: ${mongoConnected ? 'FULL' : 'DEMO (no database)'}`)
+    
+    // Start cleanup job after server is ready (every 60 seconds)
+    if (mongoConnected) {
+      cleanupInterval = setInterval(cleanupInactiveSessions, 60 * 1000)
+      console.log('[Cleanup] Inactive session cleanup job started (runs every 60s)')
+    }
   })
 }
 
 bootstrap().catch((err) => {
   console.error('Startup failed', err)
-  process.exit(1)
+  // Don't exit on startup failure in demo mode - just warn
+  console.warn('Server may have limited functionality')
 })
 
 async function shutdown(): Promise<void> {
   console.log('Shutting down...')
+  if (cleanupInterval) {
+    clearInterval(cleanupInterval)
+  }
   await disconnectRedis().catch(() => null)
   await disconnectMongo().catch(() => null)
   process.exit(0)

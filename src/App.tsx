@@ -1,6 +1,7 @@
-import React, { Suspense, lazy } from 'react'
+import React, { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import MainLayout from './components/MainLayout'
+import { useAppStore } from './store/app'
 
 const Splash = lazy(() => import('./routes/Splash'))
 const Auth = lazy(() => import('./routes/Auth'))
@@ -20,7 +21,23 @@ const UnoResults = lazy(() => import('./games/uno/Results'))
 const DerocherLobby = lazy(() => import('./games/derocher/Lobby'))
 const DerocherBoard = lazy(() => import('./games/derocher/Board'))
 
+// Hook to sync dark mode with document
+function useDarkMode() {
+  const darkMode = useAppStore((state) => state.preferences.darkMode)
+
+  useEffect(() => {
+    const root = document.documentElement
+    if (darkMode) {
+      root.classList.add('dark')
+    } else {
+      root.classList.remove('dark')
+    }
+  }, [darkMode])
+}
+
 export default function App() {
+  useDarkMode()
+
   return (
     <div className="min-h-screen bg-bg text-txt">
       <Suspense fallback={<div className="flex h-screen items-center justify-center text-muted">Chargement…</div>}>

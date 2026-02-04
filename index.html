@@ -1,12 +1,31 @@
 <!doctype html>
-<html lang="fr" class="dark">
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <!-- Mobile viewport - disable zoom for app-like experience -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <!-- PWA & Mobile meta tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AllForOne" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-tap-highlight" content="no" />
+    
+    <!-- Theme color (updated dynamically by app) -->
+    <meta name="theme-color" content="#0a84ff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0d0b1e" media="(prefers-color-scheme: dark)" />
+    
+    <!-- Manifest & Icons -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>GameSuite</title>
+    <link rel="apple-touch-icon" href="/pwa-192.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512.png" />
+    
+    <title>AllForOne</title>
   </head>
-  <body class="bg-background text-white antialiased">
+  <body class="antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

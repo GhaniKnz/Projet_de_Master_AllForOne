@@ -27,8 +27,8 @@ export default function Settings() {
   return (
     <div className="space-y-6 pb-24">
       <section className="space-y-2">
-        <h1 className="text-2xl font-semibold text-txt">Preferences</h1>
-        <p className="text-sm text-muted">Personnalisez votre experience AllForOne.</p>
+        <h1 className="text-2xl font-semibold text-txt">Préférences</h1>
+        <p className="text-sm text-muted">Personnalise ton expérience AllForOne.</p>
       </section>
 
       <Card className="space-y-4">

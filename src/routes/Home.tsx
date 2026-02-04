@@ -144,24 +144,27 @@ export default function Home() {
   const activeComments = activePost ? commentState : undefined
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-4 pb-24">
       <Card className="shadow-card">
-        <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-lg font-semibold text-primary">
-            VO
-          </span>
-          <div className="flex-1">
-            <label className="sr-only" htmlFor="new-post">
-              Composer une publication
-            </label>
-            <textarea
-              id="new-post"
-              rows={2}
-              value={message}
-              onChange={(event) => setMessage(event.target.value)}
-              placeholder="Quoi de neuf aujourd hui ?"
-              className="w-full resize-none border-none bg-transparent text-base text-txt placeholder:text-muted focus:outline-none"
-            />
+        <div className="flex flex-col gap-3">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+              VO
+            </span>
+            <div className="flex-1 min-w-0">
+              <label className="sr-only" htmlFor="new-post">
+                Composer une publication
+              </label>
+              <textarea
+                id="new-post"
+                rows={2}
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                placeholder="Quoi de neuf aujourd'hui ?"
+                className="w-full resize-none border-none bg-transparent text-sm text-txt placeholder:text-muted focus:outline-none"
+              />
+            </div>
+          </div>
             {selectedMedia.length ? (
               <div className="mt-3 flex flex-wrap gap-2">
                 {selectedMedia.map((item, index) => (
@@ -178,43 +181,39 @@ export default function Home() {
                 ))}
               </div>
             ) : null}
-            <div className="mt-4 flex items-center justify-between text-sm text-muted">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleAddMedia}
-                  className="flex items-center gap-2 rounded-2xl bg-primary/10 px-3 py-1.5 text-primary transition hover:bg-primary/20 focus-ring"
-                >
-                  <ImagePlus className="h-4 w-4" />
-                  Media
-                </button>
-                <button
-                  type="button"
-                  className="flex items-center gap-2 rounded-2xl bg-panel px-3 py-1.5 text-muted transition hover:text-primary focus-ring"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Boost
-                </button>
-              </div>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={refresh}
-                  className="flex items-center gap-2 rounded-2xl border border-border/60 px-3 py-1.5 text-sm font-semibold text-muted transition hover:border-primary/50 hover:text-primary focus-ring"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Rafraichir
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePublish}
-                  disabled={publishing || (!message.trim() && selectedMedia.length === 0)}
-                  className="rounded-2xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring disabled:cursor-not-allowed disabled:bg-primary/40"
-                >
-                  {publishing ? 'Publication...' : 'Publier'}
-                </button>
-              </div>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAddMedia}
+                className="flex items-center gap-1.5 rounded-xl bg-primary/10 px-2.5 py-1.5 text-xs text-primary transition hover:bg-primary/20 focus-ring"
+              >
+                <ImagePlus className="h-4 w-4" />
+                <span className="hidden xs:inline">Media</span>
+              </button>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 rounded-xl bg-panel px-2.5 py-1.5 text-xs text-muted transition hover:text-primary focus-ring"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span className="hidden xs:inline">Boost</span>
+              </button>
+              <button
+                type="button"
+                onClick={refresh}
+                className="flex items-center gap-1.5 rounded-xl border border-border/60 px-2.5 py-1.5 text-xs text-muted transition hover:border-primary/50 hover:text-primary focus-ring"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </button>
             </div>
+            <button
+              type="button"
+              onClick={handlePublish}
+              disabled={publishing || (!message.trim() && selectedMedia.length === 0)}
+              className="rounded-xl bg-primary px-4 py-1.5 text-xs font-semibold text-white shadow-card transition hover:bg-primary/90 focus-ring disabled:cursor-not-allowed disabled:bg-primary/40"
+            >
+              {publishing ? '...' : 'Publier'}
+            </button>
           </div>
         </div>
         <input

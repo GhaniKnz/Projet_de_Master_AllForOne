@@ -36,7 +36,7 @@ export function requireRole(role: 'admin') {
 
 export function issueToken(payload: AuthPayload) {
   const secret = process.env.JWT_SECRET || 'dev-secret'
-  return jwt.sign(payload, secret, { expiresIn: '1h' })
+  return jwt.sign(payload, secret, { expiresIn: '7d' })
 }
 
 export function getAuthPayload(req: Request): AuthPayload | null {

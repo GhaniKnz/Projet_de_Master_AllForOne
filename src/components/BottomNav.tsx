@@ -19,16 +19,16 @@ const tabs: TabConfig[] = [
 export default function BottomNav() {
 
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-4 flex justify-center px-4 sm:px-6 lg:px-0">
-      <div className="pointer-events-auto w-full max-w-xl">
-        <div className="glass-surface relative flex items-center justify-between rounded-3xl border border-white/60 px-3 py-2 shadow-soft sm:px-6 sm:py-3">
+    <nav className="absolute bottom-3 left-3 right-3 z-50">
+      <div className="max-w-md mx-auto">
+        <div className="bg-surface dark:bg-panel backdrop-blur-xl flex items-center justify-around rounded-2xl border border-border/30 px-2 py-2 shadow-lg">
           {tabs.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
               aria-label={label}
               className={({ isActive }) =>
-                `group flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
+                `group flex flex-col items-center justify-center gap-0.5 px-3 py-1 text-[10px] font-medium transition-colors touch-feedback ${
                   isActive ? 'text-primary' : 'text-muted'
                 }`
               }
@@ -37,13 +37,13 @@ export default function BottomNav() {
                 <>
                   <span
                     aria-current={isActive ? 'page' : undefined}
-                    className={`flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-200 ${
-                      isActive ? 'bg-primary/10 text-primary shadow-card' : 'bg-transparent'
+                    className={`flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 ${
+                      isActive ? 'bg-primary/15 text-primary' : 'bg-transparent'
                     }`}
                   >
                     <Icon className="h-5 w-5" />
                   </span>
-                  <span className="hidden sm:inline">{label}</span>
+                  <span className="truncate max-w-[48px]">{label}</span>
                 </>
               )}
             </NavLink>

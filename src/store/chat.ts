@@ -1,7 +1,13 @@
 import { create } from 'zustand'
-import type { Socket } from 'socket.io-client'
 import { api, ConversationSummary, ChatMessage, isBackendConfigured, isApiError, getCurrentUser } from '../lib/api'
-import { getSocket, disconnectSocket } from '../lib/socket'
+import { 
+  getSocket, 
+  disconnectSocket, 
+  joinConversations, 
+  joinConversation as socketJoinConversation,
+  onChatMessage,
+  onConversationCreated 
+} from '../lib/socket'
 
 const fallbackConversations: ConversationSummary[] = [
   {
@@ -46,8 +52,9 @@ const fallbackMessages: Record<string, ChatMessage[]> = {
   ]
 }
 
-let chatSocket: Socket | null = null
-let chatListenersRegistered = false
+let socketListenersRegistered = false
+let unsubscribeMessage: (() => void) | null = null
+let unsubscribeConversation: (() => void) | null = null
 
 function dedupeMessages(messages: ChatMessage[]): ChatMessage[] {
   const byId = new Map<string, ChatMessage>()
@@ -78,10 +85,17 @@ function buildOfflineMessages(): Record<string, ConversationMessagesState> {
 }
 
 function switchToOffline(set: (fn: any) => void, message?: string) {
-  chatSocket = null
-  chatListenersRegistered = false
+  socketListenersRegistered = false
+  if (unsubscribeMessage) {
+    unsubscribeMessage()
+    unsubscribeMessage = null
+  }
+  if (unsubscribeConversation) {
+    unsubscribeConversation()
+    unsubscribeConversation = null
+  }
   disconnectSocket()
-  set((state) => ({
+  set((state: ChatState) => ({
     remote: false,
     loading: false,
     conversations: sortConversations(fallbackConversations),
@@ -123,75 +137,68 @@ function applyMessageSnapshot(state: ChatState, conversationId: string, message:
   }
 }
 
-function ensureChatSocket(
+function setupSocketListeners(
   set: (fn: (state: ChatState) => Partial<ChatState> | void) => void,
-  get: () => ChatState,
-  conversationIds?: string[]
+  get: () => ChatState
 ) {
+  if (socketListenersRegistered) return
   if (!isBackendConfigured()) return
+  
   const socket = getSocket()
-  if (!socket) return
-  if (chatSocket && chatSocket !== socket) {
-    chatListenersRegistered = false
+  if (!socket) {
+    console.log('[ChatStore] No socket available')
+    return
   }
-  chatSocket = socket
-  if (!chatListenersRegistered) {
-    socket.on('connect', () => {
-      const ids = get()
-        .conversations.map((conversation) => conversation.id)
-        .filter(Boolean)
-      if (ids.length) {
-        socket.emit('join_conversations', ids)
+
+  console.log('[ChatStore] Setting up socket listeners')
+
+  // Listen for incoming chat messages
+  unsubscribeMessage = onChatMessage((payload) => {
+    console.log('[ChatStore] 📩 Message received for conversation:', payload.conversationId)
+    if (!payload?.conversationId || !payload?.message) return
+    
+    const viewerId = getCurrentUser()?.userId
+    set((state) => {
+      const { normalized, partial } = applyMessageSnapshot(state, payload.conversationId, payload.message)
+      const unread = { ...state.unread }
+      
+      // Don't increment unread if we're viewing this conversation or if we sent the message
+      if (state.activeId === payload.conversationId || (viewerId && normalized.senderId === viewerId)) {
+        unread[payload.conversationId] = 0
+      } else {
+        unread[payload.conversationId] = (unread[payload.conversationId] ?? 0) + 1
       }
-      const active = get().activeId
-      if (active) {
-        socket.emit('join_conversation', active)
+      
+      return { ...partial, unread }
+    })
+  })
+
+  // Listen for new conversations
+  unsubscribeConversation = onConversationCreated((conversation) => {
+    if (!conversation) return
+    console.log('[ChatStore] New conversation created:', conversation.id)
+    
+    set((state) => {
+      if (state.conversations.some((existing) => existing.id === conversation.id)) {
+        return {}
+      }
+      return {
+        conversations: sortConversations([conversation, ...state.conversations]),
+        unread: { ...state.unread, [conversation.id]: 0 }
       }
     })
+    
+    // Join the new conversation room
+    socketJoinConversation(conversation.id)
+  })
 
-    socket.on('disconnect', () => {
-      chatListenersRegistered = false
-    })
-
-    socket.on('chat_message', (payload: { conversationId: string; message: ChatMessage }) => {
-      if (!payload?.conversationId || !payload?.message) return
-      const viewerId = getCurrentUser()?.userId
-      set((state) => {
-        const { normalized, partial } = applyMessageSnapshot(state, payload.conversationId, payload.message)
-        const unread = { ...state.unread }
-        if (state.activeId === payload.conversationId || (viewerId && normalized.senderId === viewerId)) {
-          unread[payload.conversationId] = 0
-        } else {
-          unread[payload.conversationId] = (unread[payload.conversationId] ?? 0) + 1
-        }
-        return { ...partial, unread }
-      })
-    })
-
-    socket.on('conversation_created', (conversation: ConversationSummary) => {
-      if (!conversation) return
-      set((state) => {
-        if (state.conversations.some((existing) => existing.id === conversation.id)) {
-          return {}
-        }
-        return {
-          conversations: sortConversations([conversation, ...state.conversations]),
-          unread: { ...state.unread, [conversation.id]: 0 }
-        }
-      })
-      const joinedSocket = chatSocket ?? socket
-      joinedSocket?.emit('join_conversation', conversation.id)
-    })
-
-    chatListenersRegistered = true
+  socketListenersRegistered = true
+  
+  // Join all existing conversations
+  const conversationIds = get().conversations.map((c) => c.id).filter(Boolean)
+  if (conversationIds.length) {
+    joinConversations(conversationIds)
   }
-
-  const idsToJoin = (conversationIds ?? get().conversations.map((conv) => conv.id)).filter(Boolean)
-  if (idsToJoin.length) {
-    socket.emit('join_conversations', idsToJoin)
-  }
-
-  return socket
 }
 
 type ChatState = {
@@ -240,7 +247,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
         return { conversations: sorted, unread, loading: false }
       })
-      ensureChatSocket(set, get, sorted.map((conversation) => conversation.id))
+      setupSocketListeners(set, get)
+      joinConversations(sorted.map((conversation) => conversation.id))
     } catch (err: any) {
       if (isApiError(err)) {
         if (err.status === 401) {
@@ -280,7 +288,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
         return { conversations: sorted, unread }
       })
-      ensureChatSocket(set, get, sorted.map((conversation) => conversation.id))
+      setupSocketListeners(set, get)
+      joinConversations(sorted.map((conversation) => conversation.id))
     } catch (err: any) {
       if (isApiError(err)) {
         if (err.status === 401) {
@@ -332,8 +341,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
         unread: { ...state.unread, [id]: 0 }
       }))
-      const socket = ensureChatSocket(set, get)
-      socket?.emit('join_conversation', id)
+      setupSocketListeners(set, get)
+      socketJoinConversation(id)
     } catch (err: any) {
       if (isApiError(err)) {
         if (err.status === 401) {
@@ -399,7 +408,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           unread: { ...state.unread, [id]: 0 }
         }
       })
-      ensureChatSocket(set, get)
+      setupSocketListeners(set, get)
     } catch (err: any) {
       if (isApiError(err)) {
         if (err.status === 401) {
@@ -508,7 +517,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           unread: { ...state.unread, [res.id]: 0 }
         }
       })
-      ensureChatSocket(set, get, [res.id])
+      setupSocketListeners(set, get)
+      socketJoinConversation(res.id)
       return res
     } catch (err: any) {
       if (isApiError(err)) {
@@ -543,7 +553,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           unread: { ...state.unread, [id]: 0 }
         }
       })
-      ensureChatSocket(set, get)
+      setupSocketListeners(set, get)
       return res
     } catch (err: any) {
       if (isApiError(err)) {

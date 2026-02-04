@@ -122,10 +122,14 @@ chatRouter.post('/:id/messages', requireAuth, async (req: RequestWithId, res: Re
   }
 
   const broadcastPayload = { conversationId: req.params.id, message }
+  console.log('[Chat] Broadcasting message to conversation:', req.params.id)
   emitChatEvent(req.params.id, 'chat_message', broadcastPayload)
   conv.members
     .filter((memberId) => memberId !== auth.userId)
-    .forEach((memberId) => emitUserEvent(memberId, 'chat_message', broadcastPayload))
+    .forEach((memberId) => {
+      console.log('[Chat] Sending message to user:', memberId)
+      emitUserEvent(memberId, 'chat_message', broadcastPayload)
+    })
 
   res.status(201).json(message)
 })

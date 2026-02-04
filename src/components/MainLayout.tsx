@@ -41,12 +41,12 @@ export default function MainLayout() {
   }, [user, setUser, navigate])
 
   return (
-    <div className="min-h-screen bg-bg text-txt">
+    <div className="h-screen bg-bg text-txt flex flex-col no-select overflow-hidden relative">
       <Header />
-      <div className="mt-2">
+      <div className="px-4 py-1">
         <EnvBanner />
       </div>
-      <main className="mx-auto flex w-full max-w-xl flex-col gap-6 px-4 pb-32 pt-6">
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 px-4 py-4 pb-20 overflow-y-auto overflow-x-hidden">
         <Outlet />
       </main>
       <GameLauncher />

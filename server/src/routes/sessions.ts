@@ -206,3 +206,79 @@ function generateAccessCode() {
   for (let i = 0; i < 4; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)]
   return code
 }
+
+// Rejoin an active session (for players who disconnected)
+sessionsRouter.post('/:id/rejoin', requireAuth, async (req: SessionIdRequest, res: Response) => {
+  const auth = req.auth!
+  const session = await SessionModel.findById(req.params.id)
+  if (!session) return res.status(404).json({ error: 'Not found' })
+  
+  // Check if player was part of this session
+  const existingPlayer = session.players.find((p) => p.id === auth.userId)
+  if (!existingPlayer) {
+    return res.status(403).json({ error: 'You were not part of this session' })
+  }
+  
+  // Allow rejoin if session is still active (waiting or in-game)
+  if (session.status === 'completed') {
+    return res.status(400).json({ error: 'Session has already ended' })
+  }
+  
+  // Update player status to show they're back
+  session.players = session.players.map((player) =>
+    player.id === auth.userId
+      ? { ...player, status: session.status === 'in-game' ? 'playing' : 'ready' }
+      : player
+  )
+  
+  // Update last activity timestamp
+  session.updatedAt = new Date()
+  await session.save()
+  clearSessionCache(session.gameId)
+  
+  return res.json(toClientSession(session))
+})
+
+// Delete inactive sessions (called periodically)
+sessionsRouter.delete('/cleanup/inactive', async (_req: Request, res: Response) => {
+  const oneMinuteAgo = new Date(Date.now() - 60 * 1000) // 1 minute
+  
+  // Find and delete sessions that haven't been updated in 1 minute
+  // This includes both 'waiting' and 'in-game' sessions that are inactive
+  const result = await SessionModel.deleteMany({
+    status: { $in: ['waiting', 'in-game'] },
+    updatedAt: { $lt: oneMinuteAgo }
+  })
+  
+  // Clear all session caches
+  const redis = getRedis()
+  if (redis) {
+    const keys = await redis.keys('sessions:*')
+    if (keys.length > 0) {
+      await redis.del(keys)
+    }
+  }
+  
+  return res.json({ deleted: result.deletedCount })
+})
+
+// Delete a specific session (when game ends)
+sessionsRouter.delete('/:id', requireAuth, async (req: SessionIdRequest, res: Response) => {
+  const auth = req.auth!
+  const session = await SessionModel.findById(req.params.id)
+  
+  if (!session) {
+    return res.status(404).json({ error: 'Session not found' })
+  }
+  
+  // Only host or a player in the session can delete it
+  const isPlayerInSession = session.players.some(p => p.id === auth.userId)
+  if (!isPlayerInSession && session.hostId !== auth.userId) {
+    return res.status(403).json({ error: 'Not authorized to delete this session' })
+  }
+  
+  await SessionModel.findByIdAndDelete(req.params.id)
+  clearSessionCache(session.gameId)
+  
+  return res.json({ ok: true })
+})
