@@ -79,6 +79,10 @@ export default function Auth() {
   }, [navigate, setUser])
 
   const googleClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID as string | undefined
+  const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined
+  const apiUnavailableMessage = apiUrl
+    ? `Serveur inaccessible. Vérifie que l'API (${apiUrl}) est lancée.`
+    : "Serveur inaccessible. Vérifie que l'API est lancée."
   const [googleReady, setGoogleReady] = React.useState(false)
 
   React.useEffect(() => {
@@ -155,7 +159,7 @@ export default function Auth() {
         if (err.status === 401) {
           setError("Email ou mot de passe incorrect.")
         } else if (err.status === 0 || err.status >= 500) {
-          setError("Serveur inaccessible. Vérifie que l'API (port 3001) est lancée.")
+          setError(apiUnavailableMessage)
         } else {
           setError(err.message || "Échec de l'authentification")
         }
@@ -179,7 +183,7 @@ export default function Auth() {
       setShowReset(true)
     } catch (err: any) {
       if (isApiError(err) && (err.status === 0 || err.status >= 500)) {
-        setError("Serveur inaccessible. Vérifie que l'API (port 3001) est lancée.")
+        setError(apiUnavailableMessage)
         return
       }
       setError(err?.message || "Impossible d'envoyer l'email de réinitialisation")
@@ -196,7 +200,7 @@ export default function Auth() {
       setMode("login")
     } catch (err: any) {
       if (isApiError(err) && (err.status === 0 || err.status >= 500)) {
-        setError("Serveur inaccessible. Vérifie que l'API est lancée.")
+        setError(apiUnavailableMessage)
         return
       }
       setError(err?.message || "Impossible de réinitialiser le mot de passe")

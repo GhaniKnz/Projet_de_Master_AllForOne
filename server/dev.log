@@ -1,0 +1,16 @@
+
+> allforone-server@0.1.0 dev
+> tsx watch src/index.ts
+
+Google OAuth client configured.
+MongoDB connected on mongodb://localhost:27017/allforone
+✅ MongoDB connected
+REDIS_URL not set, skipping Redis connection.
+✅ Redis connected
+
+🚀 AllForOne API ready on http://localhost:8080 (docs: /docs)
+   Mode: FULL
+[Cleanup] Inactive session cleanup job started (runs every 60s)
+[0mGET /health [32m200[0m 2.761 ms - 31[0m
+[0mDELETE /api/v1/sessions/cleanup/inactive [32m200[0m 9.717 ms - 13[0m
+[0mDELETE /api/v1/sessions/cleanup/inactive [32m200[0m 4.421 ms - 13[0m

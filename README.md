@@ -12,6 +12,10 @@ Quick start
 
    npm run dev
 
+   Windows full stack helper (frontend + backend + MongoDB container if Docker is running):
+
+   npm run dev:stack
+
 3. Build
 
    npm run build

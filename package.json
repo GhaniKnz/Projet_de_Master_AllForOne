@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
+    "dev:stack": "powershell -ExecutionPolicy Bypass -File ./scripts/start-dev.ps1",
     "build": "vite build",
     "preview": "vite preview --port 5174",
     "test": "vitest"
